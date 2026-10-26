@@ -1,0 +1,1 @@
+Put cue1.wav ... cue4.wav here (16-bit PCM, same sample rate), then upload with the LittleFS plugin.
