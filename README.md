@@ -37,6 +37,7 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 | 6 | Momentary push button for the prop (e.g. 6–12 mm tactile or 7 mm panel push) | 2 | Pick to suit the prop. Normally-open. |
 | 7 | Miniature slide switch (SPST) | 2 | Prop power. See wiring notes. |
 | 8 | 100 kΩ resistor | 4 | 2 per prop, as a battery-voltage divider. |
+| 8a | 100 nF ceramic capacitor | 2 | Optional, one per prop, across R2 to steady the battery reading. |
 | 9 | **PCM5102A I2S DAC module** (common "GY-PCM5102" blue board) | 1 (+1 spare) | True line-level stereo out on a 3.5 mm jack. See jumper note below. |
 | 10 | **Line-level isolator / DI** (e.g. Behringer HD400, ART DTI, or a passive DI box) | 1 | Breaks the USB-to-sound-desk ground loop. Don't skip this one. |
 | 11 | 3.5 mm stereo to 2× ¼" jack or 2× XLR cable (to suit the isolator) | 1 | Line out to the isolator. |
@@ -65,6 +66,10 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 The radio is already wired internally on SPI1 (CS GPIO9, DIO0 GPIO14, RST GPIO13). **Don't use D14–D17 (GPIO 13/14/15/18) for anything else**, because those are radio signals.
 
 ### Prop
+
+![Prop transmitter schematic](docs/prop_tx_schematic.svg)
+
+(PNG version: [`docs/prop_tx_schematic.png`](docs/prop_tx_schematic.png). Regenerate with `pip install schemdraw` then `python docs/prop_tx_schematic.py docs/prop_tx_schematic.svg`.)
 
 | Board pin | Connects to |
 |---|---|
