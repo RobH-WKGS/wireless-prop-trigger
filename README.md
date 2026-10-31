@@ -48,7 +48,7 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 | # | Item | Qty | Notes |
 |---|------|-----|-------|
 | 13 | **5 mm through-hole addressable LED** (WS2812 / PL9823, 5 mm diffused) | 1 (+1 spare) | Status LED. The Challenger has no onboard NeoPixel. |
-| 14 | **3D-printed case** (see [`enclosure/`](enclosure/README.md)) | 1 | 180 × 115 × 56 mm desk console. |
+| 14 | **3D-printed case** (see [`enclosure/`](enclosure/README.md)) | 1 | 180 × 115 mm sloped desk console, two-colour labels. |
 | 15 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 | ARM. |
 | 16 | 30 mm arcade button | 1 | Backup GO. |
 | 17 | M3 × 10 socket head screws + M3 heat-set inserts | 4 each | Case fixings. |
