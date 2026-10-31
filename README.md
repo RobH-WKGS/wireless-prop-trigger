@@ -47,11 +47,13 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 
 | # | Item | Qty | Notes |
 |---|------|-----|-------|
-| 13 | **Single NeoPixel / WS2812B** (e.g. Adafruit NeoPixel Mini PCB, or a 5 mm through-hole addressable LED) | 1 (+1 spare) | Status LED. The Challenger has no onboard NeoPixel. |
-| 14 | Small project box (~100 × 60 × 30 mm) | 1 | Or 3D-print one. |
-| 15 | Toggle switch, SPST (ideally with a flip-up safety cover) | 1 | ARM. |
-| 16 | Momentary push button, 16–22 mm (arcade or panel) | 1 | Backup GO. |
-| 17 | Female headers and standoffs | 1 set | Optional, so the board is removable. |
+| 13 | **5 mm through-hole addressable LED** (WS2812 / PL9823, 5 mm diffused) | 1 (+1 spare) | Status LED. The Challenger has no onboard NeoPixel. |
+| 14 | **3D-printed case** (see [`enclosure/`](enclosure/README.md)) | 1 | 180 × 115 × 56 mm desk console. |
+| 15 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 | ARM. |
+| 16 | 30 mm arcade button | 1 | Backup GO. |
+| 17 | M3 × 10 socket head screws + M3 heat-set inserts | 4 each | Case fixings. |
+| 18 | 3.5 mm stereo panel-mount jack (6 mm thread) | 1 | Line out on the back panel. |
+| 19 | 12 mm self-adhesive rubber feet | 4 | |
 
 ### Nice to have
 
@@ -96,6 +98,7 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 | **A0** | ARM switch, other leg to **GND** (closed = armed) |
 | **A1** | GO button, other leg to **GND** |
 | U.FL | Bulkhead SMA pigtail and 868 MHz antenna |
+| DAC **LOUT / ROUT / AGND** | Panel-mount line-out jack: tip / ring / sleeve |
 
 **PCM5102A jumpers:** most GY-PCM5102 boards need **SCK tied to GND**, either via the solder pad or the SCK pin. Then use the solder pads on the back to set **FLT, DEMP and FMT low and XSMT high**. Check your board's silkscreen, because the pad numbering varies between sellers. If you get no audio or a buzz, this is the first thing to check.
 

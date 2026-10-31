@@ -1,0 +1,105 @@
+# Receiver case
+
+A 3D-printable desk console for the receiver. It has a base tray for the electronics and a flat control lid with the **ARM** flight switch, the **GO** arcade button and a **STATUS** LED. It's held together with four M3 socket-head screws.
+
+![Assembled](images/assembled.png)
+
+| | |
+|---|---|
+| ![Exploded](images/exploded.png) | ![Back panel](images/back_panel.png) |
+| ![Base inside](images/base_inside.png) | ![Lid underside, as printed](images/lid_underside.png) |
+
+**Size:** 180 × 115 mm footprint, 56 mm tall with the lid on. There's 49 mm of clear depth under the lid for the switch and button bodies.
+
+## Layout
+
+- **Lid (operator side):** ARM switch on the left, a 30 mm GO button on the right, and the STATUS LED at the back centre. Labels are debossed in Lato Black.
+- **Back panel:** USB-C (power, MIDI and charging), the ANT SMA bulkhead, and a 3.5 mm LINE OUT jack. Every cable leaves from the back, away from the operator.
+- **Inside:**
+  - **Board:** the Challenger snaps into a cradle at the back-left. Its USB-C socket sits in a thinned section of wall, so any USB-C cable plugs fully home.
+  - **DAC:** the PCM5102A module sits between two zip-tie loops at the back-right.
+  - **Battery:** an optional LiPo bay at the front-centre, with strap loops, fits cells up to about 45 × 32 × 10 mm.
+
+## Files
+
+| File | What |
+|---|---|
+| `receiver_case.scad` | Parametric source. Every size is a variable at the top, grouped for the OpenSCAD Customizer. |
+| `stl/receiver_base.stl` | Base tray. Print floor-down. |
+| `stl/receiver_lid.stl` | Lid, **already flipped** so the top face is on the bed. |
+| `stl/receiver_fit_panel.stl` | Test strip with the ARM, GO and LED holes. |
+| `stl/receiver_fit_cradle.stl` | The corner of the base around the board: cradle, plus the back wall with the USB-C cut-out. |
+
+## Before you print the full case
+
+The STLs use typical sizes for each part. **Measure your actual flight switch and arcade button**, set them in the *Controls* section of the `.scad`, then print the two fit-test pieces. Each takes 20–30 minutes.
+
+1. **`fit_panel`:**
+   - The switch and button should fit their holes and their nuts or clips should grip.
+   - The 5 mm LED should push up through its hole from below.
+2. **`fit_cradle`:**
+   - The Challenger should click down under the four corner lips.
+   - The USB-C socket should line up with the wall opening, and a cable should plug fully in.
+   - If a corner lip lands on a component, trim it with a knife.
+
+Settings you may need to change:
+
+| Variable | Default | Change it if… |
+|---|---|---|
+| `go_hole_d` | 30.2 | Your button is 24 mm (use 24.2), or a big dome; check its datasheet. |
+| `go_panel_t` | 2.5 | Snap-in buttons need a thin panel (≤ 3 mm). Screw-nut buttons are fine at 4. |
+| `arm_hole_d` / `arm_key_w` | 12.2 / 0 | Your missile switch has a different bushing or an anti-rotation tab. |
+| `usb_z_above_pcb` | 1.63 | The USB-C opening is too high or low on the fit test (mid-mount sockets sit lower). |
+| `insert_d` | 4.0 | Your M3 inserts specify a different hole. Set `fastener = "tap"` to screw straight into plastic instead. |
+| `battery_bay` | true | You're running from USB only. |
+
+To export: open `receiver_case.scad`, pick `part` in the Customizer, then render (F6) and export STL. Or from the command line:
+
+```
+openscad -D 'part="base"' -o receiver_base.stl receiver_case.scad
+openscad -D 'part="lid"'  -o receiver_lid.stl  receiver_case.scad
+```
+
+The labels use the **Lato** font. If it isn't installed, OpenSCAD substitutes a default. Set `label_font` to change it.
+
+## Printing
+
+| | Base | Lid |
+|---|---|---|
+| Orientation | Floor on the bed | Top face on the bed (as exported) |
+| Supports | None | None |
+| Layer height | 0.2 mm | 0.2 mm (0.16 for crisper labels) |
+| Walls / perimeters | 4 | 4 |
+| Infill | 20% gyroid | 25% |
+| Time (approx.) | 7–9 h | 3–4 h |
+
+PLA+ or PETG both work. PETG is tougher if the box will be knocked around backstage.
+
+The debossed labels can be colour-filled: wipe on acrylic paint and scrape the surface clean, or pause the print after the first few layers of the lid and change filament.
+
+## Hardware
+
+| Item | Qty |
+|---|---|
+| M3 × 10 socket head cap screw | 4 |
+| M3 heat-set insert, about 5.7 mm long (4.0 mm hole) | 4 |
+| 12 mm self-adhesive rubber bumper feet | 4 |
+| Flight / missile toggle switch with flip cover (12 mm bushing) | 1 |
+| 30 mm arcade button | 1 |
+| 5 mm through-hole addressable LED (WS2812/PL9823 5 mm) | 1 |
+| 3.5 mm stereo panel-mount jack (6 mm thread) | 1 |
+| SMA bulkhead to U.FL pigtail + 868 MHz antenna | 1 |
+| Zip ties (3 mm), foam tape, hook-and-loop strap | a few |
+
+## Assembly
+
+1. **Inserts:** press them into the four base posts with a soldering iron at about 220 °C. Keep them square.
+2. **Board:** press it down into the cradle, USB end first, until it clicks under the lips.
+3. **DAC:** stick it down with foam tape between its two loops, then zip-tie it.
+4. **Back panel:** fit the SMA bulkhead and the line-out jack. Wire the jack to the DAC's **LOUT**, **ROUT** and **AGND** pins.
+5. **Lid:**
+   - Fit the ARM switch, the GO button and the LED. The LED's rim sits in the tube under the lid; add a dab of hot glue.
+   - Wire the switch and button to the board (see the main README).
+   - Leave enough wire slack to open the lid fully.
+6. **Close up:** drop the lid on (the skirt locates it) and fit the four M3 × 10 screws. Don't over-tighten into the inserts.
+7. **Feet:** stick the four rubber feet into the recesses underneath.
