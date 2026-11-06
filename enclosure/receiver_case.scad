@@ -61,6 +61,11 @@ arm_key_w      = 0;      // anti-rotation key width (0 = none)
 arm_key_l      = 1.5;
 arm_body_d     = 24;     // clearance envelope under the lid (preview / checks)
 arm_body_depth = 38;
+// rotation stop: a pocket in the top that the switch cover's base sits in
+arm_stop_w      = 16.4;  // cover base is 16 mm wide (+0.4 clearance); 0 = no pocket
+arm_stop_l      = 40;    // pocket length along the slope (longer than the base is fine)
+arm_stop_depth  = 1.6;
+arm_stop_offset = 0;     // shift the pocket along the slope if the hole isn't central in the base
 
 go_x           = 135;
 go_y           = 54;
@@ -70,8 +75,8 @@ go_relief_d    = 46;
 go_body_d      = 33;
 go_body_depth  = 42;
 
-led_x          = 90;
-led_y          = 96;
+// 5 mm addressable LEDs: [x, y, label]
+leds           = [[72, 96, "SIGNAL"], [108, 96, "TRIGGER"]];
 led_hole_d     = 5.3;    // 5 mm through-hole addressable LED
 led_rim_d      = 6.2;
 led_tube_od    = 9.5;
@@ -298,12 +303,23 @@ module base_text() { base_label_shapes(0); }
 // ---------------------------------------------------------------------
 //  LID — built in world coordinates, sitting on the base
 // ---------------------------------------------------------------------
+arm_label_y = arm_stop_w > 0 ? arm_y + arm_stop_offset - arm_stop_l / 2 - 7
+                             : arm_y - arm_body_d / 2 - 10;
+
 module lid_label_shapes(out) {   // lid frame
     translate([0, 0, lid_t - label_depth]) linear_extrude(label_depth + out) {
-        translate([arm_x, arm_y - arm_body_d / 2 - 10]) label("ARM", 9);
+        translate([arm_x, arm_label_y]) label("ARM", 9);
         translate([go_x, go_y - go_relief_d / 2 - 7]) label("GO", 11);
-        translate([led_x, led_y - 9]) label("STATUS", 5);
+        for (l = leds) translate([l[0], l[1] - 9]) label(l[2], 5);
     }
+}
+
+// rotation-stop pocket for the flight switch cover (lid frame, cut from the top face)
+module arm_stop_pocket(top_z) {
+    if (arm_stop_w > 0)
+        translate([arm_x - arm_stop_w / 2, arm_y + arm_stop_offset - arm_stop_l / 2, top_z - arm_stop_depth])
+            linear_extrude(arm_stop_depth + 1)
+                offset(r = 1) offset(delta = -1) square([arm_stop_w, arm_stop_l]);
 }
 
 module lid_local_cuts() {   // lid frame
@@ -315,11 +331,14 @@ module lid_local_cuts() {   // lid frame
         cylinder(d = arm_hole_d, h = lid_t + 2);
         if (arm_key_w > 0) translate([-arm_key_w / 2, 0, 0]) cube([arm_key_w, arm_hole_d / 2 + arm_key_l, lid_t + 2]);
     }
+    arm_stop_pocket(lid_t);
     translate([go_x, go_y, -1]) cylinder(d = go_hole_d, h = lid_t + 2);
     if (go_panel_t < lid_t)
         translate([go_x, go_y, -1]) cylinder(d = go_relief_d, h = 1 + lid_t - go_panel_t);
-    translate([led_x, led_y, -1]) cylinder(d = led_hole_d, h = lid_t + 2);
-    translate([led_x, led_y, lid_t - 0.6]) cylinder(d1 = led_hole_d, d2 = led_hole_d + 1.2, h = 0.61);
+    for (l = leds) translate([l[0], l[1], 0]) {
+        translate([0, 0, -1]) cylinder(d = led_hole_d, h = lid_t + 2);
+        translate([0, 0, lid_t - 0.6]) cylinder(d1 = led_hole_d, d2 = led_hole_d + 1.2, h = 0.61);
+    }
     lid_label_shapes(1);
 }
 
@@ -349,8 +368,8 @@ module lid_world() {
                 translate([wall + fit_gap, wall + fit_gap, -1]) rrect(iw, id, H, ir);
                 slab(-boss_h, eps);
             }
-            // LED holder tube
-            on_lid() translate([led_x, led_y, -led_tube_h]) difference() {
+            // LED holder tubes
+            for (l = leds) on_lid() translate([l[0], l[1], -led_tube_h]) difference() {
                 cylinder(d = led_tube_od, h = led_tube_h + eps);
                 translate([0, 0, -1]) cylinder(d = led_rim_d, h = led_tube_h + 2);
             }
@@ -375,6 +394,7 @@ module fit_panel() {
             cylinder(d = arm_hole_d, h = lid_t + 2);
             if (arm_key_w > 0) translate([-arm_key_w / 2, 0, 0]) cube([arm_key_w, arm_hole_d / 2 + arm_key_l, lid_t + 2]);
         }
+        translate([20 - arm_x, d / 2 - arm_y, 0]) arm_stop_pocket(lid_t);   // rotation stop
         translate([70, d / 2, -1]) cylinder(d = go_hole_d, h = lid_t + 2);
         if (go_panel_t < lid_t)
             translate([70, d / 2, -1]) cylinder(d = min(go_relief_d, d - 4), h = 1 + lid_t - go_panel_t);

@@ -17,18 +17,23 @@
 //           within ~12 ms, not after a DAC wake-up.
 //
 //  Panel controls
-//   ARM switch  (A0 -> GND = armed). Disarmed: prop presses are shown on
-//               the status LED (magenta flash) but fire NOTHING — lets the
-//               actor test the prop in the wings.
+//   ARM switch  (A0 -> GND = armed). Disarmed: prop presses light the
+//               TRIGGER LED magenta but fire NOTHING — lets the actor test
+//               the prop in the wings.
 //   GO button   (A1 -> GND). Operator backup: fires cue 1 (MIDI + audio)
 //               whether armed or not.
+//   A cue can fire at most once per second (MIN_TRIGGER_GAP_MS), whatever
+//   fires it — prop, GO, or both together never double-fire.
 //
-//  Status NeoPixel (external, on D10 — the Challenger has no onboard one)
-//   red       no prop heard for 3 s (off / flat battery / out of range)
-//   green      prop alive, ARMED
-//   blue       prop alive, disarmed (test mode)
-//   amber blink prop battery low
-//   white      cue fired           magenta  press received while disarmed
+//  Two 5 mm addressable LEDs, chained on D10 (LED 1 DOUT -> LED 2 DIN)
+//   SIGNAL  (LED 1) — connection to the prop
+//     red          no prop heard for 3 s (off / flat battery / out of range)
+//     green        prop alive, ARMED
+//     blue         prop alive, disarmed (test mode)
+//     amber blink  prop battery low
+//   TRIGGER (LED 2) — on for 1 s each time the prop is pressed
+//     white        cue fired (prop or GO button)
+//     magenta      prop pressed while DISARMED (nothing fired)
 // =====================================================================
 
 #include <SPI.h>
@@ -61,7 +66,11 @@
 // ---------- Panel ----------------------------------------------------
 #define ARM_PIN        A0
 #define GO_PIN         A1
-#define STATUS_PIXEL_PIN D10       // external single NeoPixel / WS2812 data in
+#define PIXEL_PIN      D10         // data in of LED 1 (SIGNAL); LED 2 (TRIGGER) chains from it
+#define PX_SIGNAL      0
+#define PX_TRIGGER     1
+#define TRIGGER_LED_MS 1000        // how long the TRIGGER LED stays lit
+#define MIN_TRIGGER_GAP_MS 1000    // a cue can't fire again within this time
 
 // ---------- Radio (built in on the Challenger, wired to SPI1) --------
 #define RFM_CS         9           // RFM69HCW_SS
@@ -83,16 +92,20 @@ struct __attribute__((packed)) Packet {
 RFM69 radio(RFM_CS, RFM_IRQ, true, &SPI1);
 Adafruit_USBD_MIDI usbMidi;
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usbMidi, MIDI);
-Adafruit_NeoPixel pixel(1, STATUS_PIXEL_PIN, NEO_GRB + NEO_KHZ800);
+// 5 mm WS2812/PL9823 LEDs are often RGB order rather than GRB: if red and
+// green look swapped, change NEO_GRB to NEO_RGB.
+Adafruit_NeoPixel pixel(2, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 // ---------- State (core 0) -------------------------------------------
 struct NodeState { uint32_t lastHeard; uint8_t lastSeq; uint32_t lastSeqAt; uint16_t battMv; int16_t rssi; };
 NodeState nodes[8];                 // index = sender node id (2..7 used)
 uint32_t noteOffAt[MAX_CUES + 1] = {0};
-uint32_t flashUntil = 0;
-uint32_t flashColour = 0;
+uint32_t lastFireAt[MAX_CUES + 1] = {0};
+bool     everFired[MAX_CUES + 1] = {false};
+uint32_t trigLedUntil = 0;
+uint32_t trigLedColour = 0;
+uint32_t lastDisarmedFlash = 0;
 bool     lastGo = HIGH;
-uint32_t lastGoAt = 0;
 
 // ---------- Shared between cores -------------------------------------
 volatile uint8_t pendingCue = 0;    // written by core 0, cleared by core 1
@@ -101,15 +114,27 @@ volatile bool    audioReady = false;
 // =====================================================================
 //  CORE 0 — radio, MIDI, panel
 // =====================================================================
+void lightTrigger(uint32_t colour) {
+  trigLedColour = colour;
+  trigLedUntil  = millis() + TRIGGER_LED_MS;
+}
+
 void fireCue(uint8_t cue, const char *source) {
   if (cue < 1 || cue > MAX_CUES) return;
+  uint32_t now = millis();
+  // At most one fire per second per cue, from any source
+  if (everFired[cue] && (now - lastFireAt[cue]) < MIN_TRIGGER_GAP_MS) {
+    Serial.printf("[%lu] cue %u from %s ignored (fired %lu ms ago)\n", now, cue, source, now - lastFireAt[cue]);
+    return;
+  }
+  everFired[cue]  = true;
+  lastFireAt[cue] = now;
   uint8_t note = MIDI_BASE_NOTE + cue - 1;
   MIDI.sendNoteOn(note, 127, MIDI_CHANNEL);
-  noteOffAt[cue] = millis() + NOTE_LENGTH_MS;
+  noteOffAt[cue] = now + NOTE_LENGTH_MS;
   if (ENABLE_AUDIO) pendingCue = cue;
-  flashColour = pixel.Color(255, 255, 255);
-  flashUntil  = millis() + 250;
-  Serial.printf("[%lu] FIRE cue %u (note %u) from %s\n", millis(), cue, note, source);
+  lightTrigger(pixel.Color(255, 255, 255));
+  Serial.printf("[%lu] FIRE cue %u (note %u) from %s\n", now, cue, note, source);
 }
 
 void handlePacket(uint16_t sender, const Packet &p, int16_t rssi) {
@@ -132,18 +157,19 @@ void handlePacket(uint16_t sender, const Packet &p, int16_t rssi) {
     char src[24]; snprintf(src, sizeof(src), "prop %u (RSSI %d)", sender, rssi);
     fireCue(p.cue, src);
   } else {
-    flashColour = pixel.Color(255, 0, 255);
-    flashUntil  = now + 250;
+    // same 1-per-second limit applies to the test flash
+    if (now - lastDisarmedFlash >= MIN_TRIGGER_GAP_MS) {
+      lastDisarmedFlash = now;
+      lightTrigger(pixel.Color(255, 0, 255));
+    }
     Serial.printf("[%lu] Press from prop %u ignored (DISARMED), RSSI %d\n", now, sender, rssi);
   }
 }
 
-void updateStatusLed() {
+void updateLeds() {
   uint32_t now = millis();
   uint32_t c;
-  if (now < flashUntil) {
-    c = flashColour;
-  } else {
+  {
     bool alive = false, lowBatt = false;
     for (int i = 2; i < 8; i++) {
       if (nodes[i].lastHeard && (now - nodes[i].lastHeard) < PROP_TIMEOUT_MS) {
@@ -157,8 +183,14 @@ void updateStatusLed() {
     else if (armed)                      c = pixel.Color(0, 255, 0);
     else                                 c = pixel.Color(0, 0, 255);
   }
-  static uint32_t shown = 1;
-  if (c != shown) { pixel.setPixelColor(0, c); pixel.show(); shown = c; }
+  uint32_t t = ((int32_t)(trigLedUntil - now) > 0) ? trigLedColour : 0;
+  static uint32_t shownSig = 1, shownTrig = 1;
+  if (c != shownSig || t != shownTrig) {
+    pixel.setPixelColor(PX_SIGNAL, c);
+    pixel.setPixelColor(PX_TRIGGER, t);
+    pixel.show();
+    shownSig = c; shownTrig = t;
+  }
 }
 
 void setup() {
@@ -176,7 +208,9 @@ void setup() {
 
   pixel.begin();
   pixel.setBrightness(25);                           // backstage-friendly
-  pixel.setPixelColor(0, pixel.Color(255, 0, 0)); pixel.show();
+  pixel.setPixelColor(PX_SIGNAL, pixel.Color(255, 0, 0));
+  pixel.setPixelColor(PX_TRIGGER, 0);
+  pixel.show();
 
   pinMode(RFM_RST, OUTPUT);
   digitalWrite(RFM_RST, HIGH); delay(10);
@@ -184,7 +218,8 @@ void setup() {
 
   if (!radio.initialize(RF69_868MHZ, RX_NODE_ID, NETWORK_ID)) {
     while (true) {                                   // radio fault: fast red/off blink
-      pixel.setPixelColor(0, (millis() / 100) % 2 ? pixel.Color(255, 0, 0) : 0); pixel.show();
+      uint32_t on = (millis() / 100) % 2 ? pixel.Color(255, 0, 0) : 0;
+      pixel.setPixelColor(PX_SIGNAL, on); pixel.setPixelColor(PX_TRIGGER, on); pixel.show();
       delay(50);
     }
   }
@@ -211,10 +246,7 @@ void loop() {
 
   // Operator backup GO button (always live)
   bool g = digitalRead(GO_PIN);
-  if (g == LOW && lastGo == HIGH && millis() - lastGoAt > 300) {
-    lastGoAt = millis();
-    fireCue(1, "panel GO");
-  }
+  if (g == LOW && lastGo == HIGH) fireCue(1, "panel GO");   // fireCue enforces the 1 s limit
   lastGo = g;
 
   uint32_t now = millis();
@@ -225,7 +257,7 @@ void loop() {
     }
   }
 
-  updateStatusLed();
+  updateLeds();
 
   // Once a second, print link quality to the serial monitor
   static uint32_t lastReport = 0;

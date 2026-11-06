@@ -38,7 +38,7 @@
 
 #define BURST_COUNT    4                // copies of each trigger packet
 #define BURST_GAP_MS   3
-#define LOCKOUT_MS     300              // ignore bounce / double-press for this long
+#define LOCKOUT_MS     1000             // max one trigger per second (the receiver enforces this too)
 #define HEARTBEAT_MS   1000
 
 // ---------- Radio (built in on the Challenger, wired to SPI1) --------

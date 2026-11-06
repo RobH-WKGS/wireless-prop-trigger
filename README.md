@@ -14,7 +14,9 @@ Every unit uses the same board, the **iLabs Challenger RP2040 SubGHz 868 MHz**. 
 - **Radio:** RFM69 FSK at 868.3 MHz with AES-128 encryption. It's well clear of the 2.4 GHz phone and Wi-Fi traffic.
 - **Reliability:** each press sends 4 identical packets. The receiver de-duplicates them, so one lost packet changes nothing.
 - **Latency:** press to MIDI and audio is typically under 20 ms. Titan to DMX to fixtures then adds its own delay. `AUDIO_DELAY_MS` lets you hold the sound back to match the lamps if needed.
-- **Heartbeat:** the prop reports once a second, with battery voltage. The receiver's LED tells you it's alive *before* the scene.
+- **Heartbeat:** the prop reports once a second, with battery voltage. The receiver's **SIGNAL** LED tells you it's alive *before* the scene.
+- **Trigger feedback:** the receiver's **TRIGGER** LED lights for 1 second every time the prop is pressed.
+- **Rate limit:** a cue fires at most **once per second**. The prop won't send faster than that, and the receiver ignores anything sooner too, including the prop and GO pressed together.
 - **Safety:** an ARM switch on the receiver means nothing fires while you're testing the prop in the wings. A GO button on the receiver is the operator's backup.
 
 > ⚠️ **Not yet compiled.** I checked the library calls and the board's pin map against their source, but couldn't run the compiler in my environment. Expect possibly a small fix or two on the first compile. Bench-test before rehearsal.
@@ -47,7 +49,7 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 
 | # | Item | Qty | Notes |
 |---|------|-----|-------|
-| 13 | **5 mm through-hole addressable LED** (WS2812 / PL9823, 5 mm diffused) | 1 (+1 spare) | Status LED. The Challenger has no onboard NeoPixel. |
+| 13 | **5 mm through-hole addressable LED** (WS2812 / PL9823, 5 mm diffused) | 2 (+1 spare) | SIGNAL and TRIGGER LEDs, chained on one data pin. |
 | 14 | **3D-printed case** (see [`enclosure/`](enclosure/README.md)) | 1 | 180 × 115 mm sloped desk console, two-colour labels. |
 | 15 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 | ARM. |
 | 16 | 30 mm arcade button | 1 | Backup GO. |
@@ -92,13 +94,27 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 | **D5** | DAC **BCK** |
 | **D6** | DAC **LCK** (LRCLK, which the code drives as BCLK+1) |
 | **D9** | DAC **DIN** |
-| **3V3** | DAC **VIN** and NeoPixel **+** |
-| **GND** | DAC **GND** and NeoPixel **−** |
-| **D10** | NeoPixel **DIN** |
+| **3V3** | DAC **VIN**, and **+** (VDD) on both LEDs |
+| **GND** | DAC **GND**, and **−** on both LEDs |
+| **D10** | **SIGNAL** LED **DIN** |
+| SIGNAL LED **DOUT** | **TRIGGER** LED **DIN** |
 | **A0** | ARM switch, other leg to **GND** (closed = armed) |
 | **A1** | GO button, other leg to **GND** |
 | U.FL | Bulkhead SMA pigtail and 868 MHz antenna |
 | DAC **LOUT / ROUT / AGND** | Panel-mount line-out jack: tip / ring / sleeve |
+
+**5 mm LED pins:** most WS2812 / PL9823 5 mm LEDs are **DIN, VDD (+), GND, DOUT** from the flat side, with VDD the longest leg. Check your seller's pinout. If red and green show swapped, change `NEO_GRB` to `NEO_RGB` in `prop_rx.ino`.
+
+**What the LEDs show:**
+
+| LED | Colour | Meaning |
+|---|---|---|
+| **SIGNAL** | red | No prop heard for 3 s (off, flat, or out of range) |
+| | blue | Prop connected, receiver **disarmed** |
+| | green | Prop connected, receiver **armed** |
+| | amber blink | Prop battery low |
+| **TRIGGER** (1 s) | white | Cue fired (prop or GO) |
+| | magenta | Prop pressed while **disarmed**; nothing fired |
 
 **PCM5102A jumpers:** most GY-PCM5102 boards need **SCK tied to GND**, either via the solder pad or the SCK pin. Then use the solder pads on the back to set **FLT, DEMP and FMT low and XSMT high**. Check your board's silkscreen, because the pad numbering varies between sellers. If you get no audio or a buzz, this is the first thing to check.
 
@@ -156,21 +172,22 @@ No sound cues wanted? Set `ENABLE_AUDIO false` and the receiver is MIDI-only.
 
 ## Bench test
 
-1. Power the receiver over USB. The status LED should go **red** (no prop yet).
-2. Switch the prop on. The LED turns **blue** (prop alive, disarmed).
-3. Press the prop button. You get a **magenta** flash and nothing fires. The Serial Monitor prints the RSSI.
-4. Flip ARM. The LED turns **green**. Press the prop button: you get a **white** flash, the MIDI note, the WAV plays, and the Titan cue goes.
-5. Press the receiver's **GO** button. The same cue fires.
-6. **Range test in the real room**, with the actor's hand wrapped around the prop, from every position they'll use it. The Serial Monitor shows RSSI once a second:
+1. Power the receiver over USB. **SIGNAL** should go **red** (no prop yet).
+2. Switch the prop on. **SIGNAL** turns **blue** (prop alive, disarmed).
+3. Press the prop button. **TRIGGER** lights **magenta** for 1 s and nothing fires. The Serial Monitor prints the RSSI.
+4. Flip ARM. **SIGNAL** turns **green**. Press the prop button: **TRIGGER** lights **white** for 1 s, the MIDI note goes out, the WAV plays, and the Titan cue goes.
+5. Press the prop button twice quickly. Only the first press fires, and the Serial Monitor logs the second as ignored. Wait a second and it fires again.
+6. Press the receiver's **GO** button. The same cue fires.
+7. **Range test in the real room**, with the actor's hand wrapped around the prop, from every position they'll use it. The Serial Monitor shows RSSI once a second:
    - **-50 to -80 dBm:** comfortable.
    - **Worse than -90 dBm:** move the receiver antenna, reroute the prop antenna, or raise `TX_POWER_DBM` up to 14.
-7. **Lip-sync check.** If the lamps visibly lag the sound, raise `AUDIO_DELAY_MS` in 10 ms steps.
+8. **Lip-sync check.** If the lamps visibly lag the sound, raise `AUDIO_DELAY_MS` in 10 ms steps.
 
 ## Show-day checklist
 
 - [ ] Prop LiPo charged, plus a spare in the corner
-- [ ] Receiver LED **blue** when the prop is switched on in the wings
-- [ ] **ARM** flipped when the scene starts. Receiver LED **green**
+- [ ] **SIGNAL** LED **blue** when the prop is switched on in the wings. A test press lights **TRIGGER** magenta
+- [ ] **ARM** flipped when the scene starts. **SIGNAL** LED **green**
 - [ ] Operator knows: no cue within ~½ s of the moment → hit **GO** (receiver) or the cue's GO on Titan
 - [ ] **Disarm** after the scene, so the button is safe for the rest of the show
 
