@@ -59,13 +59,26 @@ arm_y          = 48;
 arm_hole_d     = 12.2;   // typical missile switch: 12 mm bushing
 arm_key_w      = 0;      // anti-rotation key width (0 = none)
 arm_key_l      = 1.5;
-arm_body_d     = 24;     // clearance envelope under the lid (preview / checks)
-arm_body_depth = 38;
-// rotation stop: a pocket in the top that the switch cover's base sits in
-arm_stop_w      = 16.4;  // cover base is 16 mm wide (+0.4 clearance); 0 = no pocket
-arm_stop_l      = 40;    // pocket length along the slope (longer than the base is fine)
-arm_stop_depth  = 1.6;
-arm_stop_offset = 0;     // shift the pocket along the slope if the hole isn't central in the base
+// switch body under the lid (16 x 29.4 mm, long side along the slope)
+arm_body_w     = 16;
+arm_body_l     = 29.4;
+arm_body_depth = 38;     // how far it hangs below the lid (preview / checks)
+// rotation stop INSIDE the lid: two rails either side of the switch body.
+// Open-ended, so it only needs the hole centred across the body's width.
+arm_rails      = true;
+arm_rail_gap   = 16.4;   // body width + 0.4 clearance
+arm_rail_t     = 2.5;
+arm_rail_h     = 8;      // depth below the lid
+arm_rail_l     = 34;     // along the slope, centred on the hole
+arm_nut_relief_d = 20;   // room for the inner panel nut to turn (0 = none)
+arm_nut_relief_h = 3;    // ...through this much of the rails' height
+// OPTIONAL outside pocket for the flip cover (off: covers vary between makers)
+arm_cover_pocket   = false;
+arm_cover_w        = 17.85 + 0.5;
+arm_cover_l        = 40.8 + 0.5;
+arm_cover_hole_end = 14.8;   // hole centre from the cover's hinge end
+arm_cover_depth    = 1.2;
+arm_cover_hinge_front = true; // hinge end toward the operator (front edge)
 
 go_x           = 135;
 go_y           = 54;
@@ -303,8 +316,10 @@ module base_text() { base_label_shapes(0); }
 // ---------------------------------------------------------------------
 //  LID — built in world coordinates, sitting on the base
 // ---------------------------------------------------------------------
-arm_label_y = arm_stop_w > 0 ? arm_y + arm_stop_offset - arm_stop_l / 2 - 7
-                             : arm_y - arm_body_d / 2 - 10;
+// how far the flip cover reaches toward the front / back of the hole
+arm_cover_front = arm_cover_hinge_front ? arm_cover_hole_end : arm_cover_l - arm_cover_hole_end;
+arm_cover_back  = arm_cover_l - arm_cover_front;
+arm_label_y = arm_y - arm_cover_front - 7;   // ARM label sits clear of the cover
 
 module lid_label_shapes(out) {   // lid frame
     translate([0, 0, lid_t - label_depth]) linear_extrude(label_depth + out) {
@@ -314,12 +329,25 @@ module lid_label_shapes(out) {   // lid frame
     }
 }
 
-// rotation-stop pocket for the flight switch cover (lid frame, cut from the top face)
-module arm_stop_pocket(top_z) {
-    if (arm_stop_w > 0)
-        translate([arm_x - arm_stop_w / 2, arm_y + arm_stop_offset - arm_stop_l / 2, top_z - arm_stop_depth])
-            linear_extrude(arm_stop_depth + 1)
-                offset(r = 1) offset(delta = -1) square([arm_stop_w, arm_stop_l]);
+// optional outside pocket for the flip cover (lid frame, cut from the top face)
+module arm_cover_pocket_cut(top_z) {
+    if (arm_cover_pocket)
+        translate([arm_x - arm_cover_w / 2, arm_y - arm_cover_front, top_z - arm_cover_depth])
+            linear_extrude(arm_cover_depth + 1)
+                offset(r = 1) offset(delta = -1) square([arm_cover_w, arm_cover_l]);
+}
+
+// rotation stop under the lid: rails either side of the switch body (lid frame, below z = 0)
+module arm_rails_solid() {
+    if (arm_rails) difference() {
+        for (sx = [-1, 1])
+            translate([arm_x + sx * (arm_rail_gap / 2 + arm_rail_t / 2) - arm_rail_t / 2,
+                       arm_y - arm_rail_l / 2, -arm_rail_h])
+                cube([arm_rail_t, arm_rail_l, arm_rail_h + eps]);
+        // relief so the inner nut on the bushing can turn
+        if (arm_nut_relief_d > 0)
+            translate([arm_x, arm_y, -arm_nut_relief_h]) cylinder(d = arm_nut_relief_d, h = arm_nut_relief_h + 1);
+    }
 }
 
 module lid_local_cuts() {   // lid frame
@@ -331,7 +359,7 @@ module lid_local_cuts() {   // lid frame
         cylinder(d = arm_hole_d, h = lid_t + 2);
         if (arm_key_w > 0) translate([-arm_key_w / 2, 0, 0]) cube([arm_key_w, arm_hole_d / 2 + arm_key_l, lid_t + 2]);
     }
-    arm_stop_pocket(lid_t);
+    arm_cover_pocket_cut(lid_t);
     translate([go_x, go_y, -1]) cylinder(d = go_hole_d, h = lid_t + 2);
     if (go_panel_t < lid_t)
         translate([go_x, go_y, -1]) cylinder(d = go_relief_d, h = 1 + lid_t - go_panel_t);
@@ -368,6 +396,8 @@ module lid_world() {
                 translate([wall + fit_gap, wall + fit_gap, -1]) rrect(iw, id, H, ir);
                 slab(-boss_h, eps);
             }
+            // flight switch rotation stop
+            on_lid() arm_rails_solid();
             // LED holder tubes
             for (l = leds) on_lid() translate([l[0], l[1], -led_tube_h]) difference() {
                 cylinder(d = led_tube_od, h = led_tube_h + eps);
@@ -389,12 +419,15 @@ module to_print() { translate([0, 0, lid_t]) rotate([180, 0, 0]) from_lid() chil
 module fit_panel() {
     w = 120; d = 56;
     translate([0, d, lid_t]) rotate([180, 0, 0]) difference() {
-        rrect(w, d, lid_t, 4);
+        union() {
+            rrect(w, d, lid_t, 4);
+            translate([20 - arm_x, d / 2 - arm_y, 0]) arm_rails_solid();   // rotation stop
+        }
         translate([20, d / 2, -1]) {
             cylinder(d = arm_hole_d, h = lid_t + 2);
             if (arm_key_w > 0) translate([-arm_key_w / 2, 0, 0]) cube([arm_key_w, arm_hole_d / 2 + arm_key_l, lid_t + 2]);
         }
-        translate([20 - arm_x, d / 2 - arm_y, 0]) arm_stop_pocket(lid_t);   // rotation stop
+        translate([20 - arm_x, d / 2 - arm_y, 0]) arm_cover_pocket_cut(lid_t);
         translate([70, d / 2, -1]) cylinder(d = go_hole_d, h = lid_t + 2);
         if (go_panel_t < lid_t)
             translate([70, d / 2, -1]) cylinder(d = min(go_relief_d, d - 4), h = 1 + lid_t - go_panel_t);
@@ -418,7 +451,7 @@ module dummy_board() {
 }
 module dummy_under_lid() {   // bodies hang perpendicular to the top
     on_lid() {
-        translate([arm_x, arm_y, -arm_body_depth]) cylinder(d = arm_body_d, h = arm_body_depth);
+        translate([arm_x - arm_body_w / 2, arm_y - arm_body_l / 2, -arm_body_depth]) cube([arm_body_w, arm_body_l, arm_body_depth]);
         translate([go_x, go_y, -go_body_depth]) cylinder(d = go_body_d, h = go_body_depth);
     }
 }

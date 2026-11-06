@@ -7,7 +7,8 @@ A 3D-printable sloped desk console for the receiver. It has a base tray for the 
 | | |
 |---|---|
 | ![Exploded](images/exploded.png) | ![Side: 12° slope](images/side.png) |
-| ![Back panel](images/back_panel.png) | ![Controls: switch pocket, LEDs](images/lid_controls.png) |
+| ![Controls and LEDs](images/lid_controls.png) | ![Switch rotation stop under the lid](images/lid_underside_stop.png) |
+| ![Back panel](images/back_panel.png) | |
 
 **Size:**
 - **Footprint:** 180 × 115 mm.
@@ -19,7 +20,8 @@ A 3D-printable sloped desk console for the receiver. It has a base tray for the 
 ## Layout
 
 - **Top:** ARM switch on the left, a 30 mm GO button on the right, and the SIGNAL and TRIGGER LEDs at the back.
-  - **Rotation stop:** the ARM switch sits in a 16.4 mm wide, 1.6 mm deep pocket. The flight switch cover's 16 mm base drops into it, so the switch can't twist when flipped.
+  - **Rotation stop (inside the lid):** two 8 mm rails under the lid sit either side of the switch's 16 × 29.4 mm body, 16.4 mm apart, so it can't twist. The rails are open-ended, so only the hole needs to be centred across the body's width. A 20 mm relief through their top 3 mm lets the inner bushing nut turn.
+  - **Flip cover:** sits on the flat top, clamped by the outer nut. An optional outside pocket for it is in the model but off by default (see below).
   - The switch, button and screws all sit square to the sloped top.
   - Positions in the `.scad` are measured along the slope from the front edge.
 - **Back panel:** USB-C (power, MIDI and charging), the ANT SMA bulkhead, and a 3.5 mm LINE OUT jack. Every cable leaves from the back.
@@ -77,7 +79,7 @@ The model uses typical sizes for each part. **Measure your actual flight switch 
 
 1. **`fit_panel`:**
    - The switch and button should fit their holes and their nuts or clips should grip.
-   - The flight switch cover should drop into its pocket and not turn.
+   - The switch body should slide between the rails underneath and not turn, and the inner nut should still turn in its relief.
    - The 5 mm LED should push up through its hole from below.
 2. **`fit_cradle`:**
    - The Challenger should click down under the four corner lips.
@@ -93,8 +95,9 @@ Settings you may need to change:
 | `go_hole_d` | 30.2 | Your button is 24 mm (use 24.2), or a big dome; check its datasheet. |
 | `go_panel_t` | 2.5 | Snap-in buttons need a thin panel (≤ 3 mm). Screw-nut buttons are fine at 4. |
 | `arm_hole_d` / `arm_key_w` | 12.2 / 0 | Your missile switch has a different bushing or an anti-rotation tab. |
-| `arm_stop_w` / `arm_stop_l` | 16.4 / 40 | The cover base is a different width, or is longer than 40 mm. Set `arm_stop_w = 0` to remove the pocket. |
-| `arm_stop_offset` | 0 | The switch hole isn't central along the cover's base. This slides the pocket along the slope. |
+| `arm_rail_gap` | 16.4 | Your switch body isn't 16 mm wide (use body width + 0.4). `arm_rails = false` removes the stop. |
+| `arm_nut_relief_d` / `_h` | 20 / 3 | Your inner bushing nut is bigger, or thicker than 3 mm. |
+| `arm_cover_pocket` | false | You want a 1.2 mm locating pocket on top for the flip cover. It's sized for a 17.85 × 40.8 mm cover with its hole 14.8 mm from the hinge end, hinge toward the operator. Covers differ between makers, so check yours first. |
 | `leds` | SIGNAL, TRIGGER | You want to move the LEDs or rename their labels. |
 | `usb_z_above_pcb` | 1.63 | The USB-C opening is too high or low on the fit test. |
 | `insert_d` | 4.0 | Your M3 inserts specify a different hole. Set `fastener = "tap"` to screw straight into plastic instead. |
@@ -148,7 +151,7 @@ PLA+ or PETG both work. PETG is tougher if the box will be knocked around backst
 3. **DAC:** stick it down with foam tape between its two loops, then zip-tie it.
 4. **Back panel:** fit the SMA bulkhead and the line-out jack. Wire the jack to the DAC's **LOUT**, **ROUT** and **AGND** pins.
 5. **Lid:**
-   - Fit the ARM switch with its cover base seated in the pocket, then the GO button and both LEDs. SIGNAL goes on the left and TRIGGER on the right. Each LED's rim sits in its tube under the lid; add a dab of hot glue.
+   - Fit the ARM switch from below with its body between the rails, then the flip cover and outer nut on top. Next fit the GO button and both LEDs. SIGNAL goes on the left and TRIGGER on the right. Each LED's rim sits in its tube under the lid; add a dab of hot glue.
    - Wire the switch, button and LEDs to the board (see the main README). The LEDs chain: SIGNAL DOUT goes to TRIGGER DIN.
    - Leave enough wire slack to open the lid fully.
 6. **Close up:** drop the lid on (the skirt locates it) and fit the four M3 × 10 screws. Don't over-tighten into the inserts.
