@@ -50,6 +50,7 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 | # | Item | Qty | Notes |
 |---|------|-----|-------|
 | 13 | **5 mm through-hole addressable LED** (WS2812 / PL9823, 5 mm diffused) | 2 (+1 spare) | SIGNAL and TRIGGER LEDs, chained on one data pin. |
+| 13a | 1N4148 diode, 330 Ω resistor, 2 × 100 nF ceramic capacitors | 1 set | LED supply, data line and decoupling (see the receiver schematic). |
 | 14 | **3D-printed case** (see [`enclosure/`](enclosure/README.md)) | 1 | 180 × 115 mm sloped desk console, two-colour labels. |
 | 15 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 | ARM. |
 | 16 | 30 mm arcade button | 1 | Backup GO. |
@@ -89,19 +90,28 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 
 ### Receiver
 
+![Receiver schematic](docs/prop_rx_schematic.svg)
+
+(PNG version: [`docs/prop_rx_schematic.png`](docs/prop_rx_schematic.png). Regenerate with `python docs/prop_rx_schematic.py docs/prop_rx_schematic.svg`.)
+
 | Board pin | Connects to |
 |---|---|
 | **D5** | DAC **BCK** |
 | **D6** | DAC **LCK** (LRCLK, which the code drives as BCLK+1) |
 | **D9** | DAC **DIN** |
-| **3V3** | DAC **VIN**, and **+** (VDD) on both LEDs |
+| **3V3** | DAC **VIN** |
+| **USB (VBUS)** | **1N4148** diode (anode), cathode to **+** (VDD) on both LEDs: about 4.3 V |
 | **GND** | DAC **GND**, and **−** on both LEDs |
-| **D10** | **SIGNAL** LED **DIN** |
+| **D10** | **330 Ω** resistor → **SIGNAL** LED **DIN** |
 | SIGNAL LED **DOUT** | **TRIGGER** LED **DIN** |
 | **A0** | ARM switch, other leg to **GND** (closed = armed) |
 | **A1** | GO button, other leg to **GND** |
 | U.FL | Bulkhead SMA pigtail and 868 MHz antenna |
 | DAC **LOUT / ROUT / AGND** | Panel-mount line-out jack: tip / ring / sleeve |
+
+Fit a **100 nF** capacitor across each LED's + and − legs, as close to the LED as you can.
+
+**Why the diode:** 5 mm WS2812/PL9823 LEDs want about 3.5–5 V, so on 3.3 V blue and green can be dim or flaky. Straight 5 V would need a 5 V data signal. One diode drop from USB 5 V gives about 4.3 V, which drives them properly while the board's 3.3 V data still reads reliably.
 
 **5 mm LED pins:** most WS2812 / PL9823 5 mm LEDs are **DIN, VDD (+), GND, DOUT** from the flat side, with VDD the longest leg. Check your seller's pinout. If red and green show swapped, change `NEO_GRB` to `NEO_RGB` in `prop_rx.ino`.
 

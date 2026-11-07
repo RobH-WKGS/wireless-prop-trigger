@@ -75,6 +75,7 @@ with schemdraw.Drawing(show=False) as d:
         'Notes\n'
         '• LiPo plugs into the JST socket; the BAT pin is the same net (tap R1 there).\n'
         '• D5 uses the internal pull-up: button pulls it to GND.\n'
+        '   Firmware sends at most one trigger per second.\n'
         '• R1/R2 halve the battery voltage for A2 (code ×2). Draws ~20 µA.\n'
         '   Skip them by setting BATT_PIN to -1 in prop_tx.ino.\n'
         '• EN to GND turns off the 3.3 V regulator; charging over USB still works.\n'
