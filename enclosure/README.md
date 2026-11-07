@@ -28,7 +28,7 @@ A 3D-printable sloped desk console for the receiver. It has a base tray for the 
 - **Front:** the "WIRELESS PROP TRIGGER" title.
 - **Inside:**
   - **Board:** the Challenger snaps into a cradle at the back-left. Its USB-C socket sits in a thinned section of wall, so any USB-C cable plugs fully home.
-  - **DAC:** zip-tie loops for the PCM5102A module.
+  - **DAC:** zip-tie loops for the MCU-5102 (PCM5102A) module.
   - **Battery:** an optional LiPo bay with strap loops.
 
 ## Files
@@ -140,7 +140,7 @@ PLA+ or PETG both work. PETG is tougher if the box will be knocked around backst
 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 |
 | 30 mm arcade button | 1 |
 | Plain 5 mm LEDs (1 green, 1 red) + 220 Ω resistors | 2 each |
-| 3.5 mm stereo panel-mount jack (6 mm thread) | 1 |
+| 3.5 mm stereo panel-mount extension cable (~6 mm thread) | 1 |
 | SMA bulkhead to U.FL pigtail + 868 MHz antenna | 1 |
 | Zip ties (3 mm), foam tape, hook-and-loop strap | a few |
 
@@ -149,7 +149,7 @@ PLA+ or PETG both work. PETG is tougher if the box will be knocked around backst
 1. **Inserts:** press them into the four base posts with a soldering iron at about 220 °C. The post tops are sloped, so press each insert square to the post top, not straight down.
 2. **Board:** press it down into the cradle, USB end first, until it clicks under the lips.
 3. **DAC:** stick it down with foam tape between its two loops, then zip-tie it.
-4. **Back panel:** fit the SMA bulkhead and the line-out jack. Wire the jack to the DAC's **LOUT**, **ROUT** and **AGND** pins.
+4. **Back panel:** fit the SMA bulkhead, and the panel end of the 3.5 mm extension cable in the LINE OUT hole. Plug its other end into the DAC module's jack.
 5. **Lid:**
    - Fit the ARM switch from below with its body between the rails, then the flip cover and outer nut on top. Next fit the GO button and both LEDs. The green SIGNAL LED goes on the left and the red TRIGGER LED on the right. Each LED's rim sits in its tube under the lid; add a dab of hot glue.
    - Wire the switch, button and LEDs to the board (see the main README and the receiver schematic).

@@ -40,7 +40,7 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 | 7 | Miniature slide switch (SPST) | 2 | Prop power. See wiring notes. |
 | 8 | 100 kΩ resistor | 4 | 2 per prop, as a battery-voltage divider. |
 | 8a | 100 nF ceramic capacitor | 2 | Optional, one per prop, across R2 to steady the battery reading. |
-| 9 | **PCM5102A I2S DAC module** (common "GY-PCM5102" blue board) | 1 (+1 spare) | True line-level stereo out on a 3.5 mm jack. See jumper note below. |
+| 9 | **MCU-5102 / CJMCU-5102 PCM5102A I2S DAC module** | 1 (+1 spare) | Line-level stereo out on its own 3.5 mm jack. Its control pins are wired, see below. |
 | 10 | **Line-level isolator / DI** (e.g. Behringer HD400, ART DTI, or a passive DI box) | 1 | Breaks the USB-to-sound-desk ground loop. Don't skip this one. |
 | 11 | 3.5 mm stereo to 2× ¼" jack or 2× XLR cable (to suit the isolator) | 1 | Line out to the isolator. |
 | 12 | USB-C **data** cable, 1–2 m | 1 | Receiver to lighting PC. A charge-only cable won't enumerate. |
@@ -55,7 +55,7 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 | 15 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 | ARM. |
 | 16 | 30 mm arcade button | 1 | Backup GO. |
 | 17 | M3 × 10 socket head screws + M3 heat-set inserts | 4 each | Case fixings. |
-| 18 | 3.5 mm stereo panel-mount jack (6 mm thread) | 1 | Line out on the back panel. |
+| 18 | 3.5 mm stereo **panel-mount extension cable** (plug to panel socket, ~6 mm thread, ~15–20 cm) | 1 | Plugs into the DAC module's jack and brings LINE OUT to the back panel. No soldering on the module. |
 | 19 | 12 mm self-adhesive rubber feet | 4 | |
 
 ### Nice to have
@@ -99,14 +99,14 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 | **D5** | DAC **BCK** |
 | **D6** | DAC **LCK** (LRCLK, which the code drives as BCLK+1) |
 | **D9** | DAC **DIN** |
-| **3V3** | DAC **VIN** |
+| **USB (5 V)** | DAC **VCC** (feeds the module's own 3.3 V regulator) |
 | **GND** | DAC **GND**, and both LED **cathodes** (short leg, flat side) |
 | **D10** | **220 Ω** → **green** SIGNAL LED anode (long leg) |
 | **D11** | **220 Ω** → **red** TRIGGER LED anode (long leg) |
 | **A0** | ARM switch, other leg to **GND** (closed = armed) |
 | **A1** | GO button, other leg to **GND** |
 | U.FL | Bulkhead SMA pigtail and 868 MHz antenna |
-| DAC **LOUT / ROUT / AGND** | Panel-mount line-out jack: tip / ring / sleeve |
+| DAC 3.5 mm jack | Panel-mount extension cable → LINE OUT on the back panel |
 
 **LED resistors:** 220 Ω gives about 5 mA, plenty for a panel indicator. Brightness is also set in software with `LED_BRIGHTNESS`, so you can dim them for a dark backstage. A bright "pure green" LED can look dim on 3.3 V; drop its resistor to 100 Ω. Keep the red at 220 Ω or more.
 
@@ -123,7 +123,17 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 
 Both LEDs light for half a second at power-up as a lamp test. Both blinking together means the radio failed to start. Whether the receiver is armed shows on the flight switch itself.
 
-**PCM5102A jumpers:** most GY-PCM5102 boards need **SCK tied to GND**, either via the solder pad or the SCK pin. Then use the solder pads on the back to set **FLT, DEMP and FMT low and XSMT high**. Check your board's silkscreen, because the pad numbering varies between sellers. If you get no audio or a buzz, this is the first thing to check.
+**DAC control pins (MCU-5102):** this module brings the PCM5102A's control pins out as header pins instead of solder pads. They must be wired, not left floating:
+
+| DAC pin | Connect to | Why |
+|---|---|---|
+| **SCL** | GND | System clock; tied low, the chip makes its own from BCK |
+| **FLT** | GND | Normal-latency filter |
+| **DMP** | GND | De-emphasis off |
+| **FMT** | GND | Standard I2S format |
+| **XMT** | the module's own **3.3V** pin | Un-mutes the output. Left low, the DAC stays silent |
+
+The module's **3.3V** pin is its regulator output. Use it only for XMT, not to power anything else. If you get no audio, check XMT first.
 
 ---
 
