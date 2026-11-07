@@ -99,7 +99,7 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 | **D5** | DAC **BCK** |
 | **D6** | DAC **LCK** (LRCLK, which the code drives as BCLK+1) |
 | **D9** | DAC **DIN** |
-| **USB (5 V)** | DAC **VCC** (feeds the module's own 3.3 V regulator) |
+| **3V3** | DAC **3.3V** pin. Leave the DAC's **VCC** pin **unconnected** |
 | **GND** | DAC **GND**, and both LED **cathodes** (short leg, flat side) |
 | **D10** | **220 Ω** → **green** SIGNAL LED anode (long leg) |
 | **D11** | **220 Ω** → **red** TRIGGER LED anode (long leg) |
@@ -131,9 +131,15 @@ Both LEDs light for half a second at power-up as a lamp test. Both blinking toge
 | **FLT** | GND | Normal-latency filter |
 | **DMP** | GND | De-emphasis off |
 | **FMT** | GND | Standard I2S format |
-| **XMT** | the module's own **3.3V** pin | Un-mutes the output. Left low, the DAC stays silent |
+| **XMT** | **3.3V** (the same pin the Challenger's 3V3 feeds) | Un-mutes the output. Left low, the DAC stays silent |
 
-The module's **3.3V** pin is its regulator output. Use it only for XMT, not to power anything else. If you get no audio, check XMT first.
+**Why 3V3 and not VCC:** VCC goes through the module's own regulator, which needs headroom above 3.3 V. That only works from USB 5 V, so the DAC goes silent on battery, and on a LiPo the regulator can leave the chip under-powered. Feeding the Challenger's regulated 3V3 straight into the module's 3.3V pin works on USB and on battery alike. The DAC draws only about 20 mA.
+
+**No audio? Test the DAC on its own** (Serial Monitor at any baud rate, receiver on USB):
+- Type **`s`** to print the audio status: which `cueN.wav` files were found, and whether I2S is running.
+- Type **`t`** to play a **1 kHz test tone** for 2 seconds. Without a laptop, **hold GO while powering up** for the same tone.
+- Tone but no cue sound → the WAV files aren't loaded or aren't 16-bit PCM. Re-upload the `data` folder.
+- No tone either → check the DAC wiring: XMT high, FLT/DMP/SCL/FMT to GND, 3.3 V on the module's 3.3V pin, and BCK/LCK/DIN on D5/D6/D9.
 
 ---
 

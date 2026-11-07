@@ -123,6 +123,8 @@ bool     lastGo = HIGH;
 // ---------- Shared between cores -------------------------------------
 volatile uint8_t pendingCue = 0;    // written by core 0, cleared by core 1
 volatile bool    audioReady = false;
+volatile bool    toneRequest = false;  // play the 1 kHz test tone (core 1)
+char             audioStatus[320] = "audio: not started";
 
 // =====================================================================
 //  CORE 0 — radio, MIDI, panel
@@ -254,6 +256,16 @@ void loop() {
 #endif
   MIDI.read();                                       // keep the USB MIDI endpoint drained
 
+  // Serial Monitor commands: 's' = audio status, 't' = 1 kHz test tone
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == 's' || c == 'S') { Serial.print(audioStatus); Serial.println(); }
+    else if (c == 't' || c == 'T') {
+      if (audioReady) { toneRequest = true; Serial.println("test tone: 1 kHz for 2 s"); }
+      else            { Serial.print("test tone unavailable: "); Serial.print(audioStatus); Serial.println(); }
+    }
+  }
+
   if (radio.receiveDone()) {
     uint16_t sender = radio.SENDERID;               // 16-bit in RFM69 lib v1.5+
     int16_t rssi   = radio.RSSI;
@@ -292,6 +304,7 @@ void loop() {
 // =====================================================================
 Cue cues[MAX_CUES + 1];
 I2S i2s(OUTPUT);
+uint32_t audioRate = 44100;
 File playing;
 uint32_t bytesLeft = 0;
 uint16_t playChannels = 1;
@@ -328,38 +341,67 @@ bool parseWav(File &f, Cue &c) {
 }
 
 void setup1() {
-  if (!ENABLE_AUDIO) return;
+  if (!ENABLE_AUDIO) { snprintf(audioStatus, sizeof(audioStatus), "audio: disabled (ENABLE_AUDIO false)"); return; }
+  pinMode(GO_PIN, INPUT_PULLUP);
   while (!Serial && millis() < 1500) delay(10);      // let core 0 bring USB up first
-  if (!LittleFS.begin()) { Serial.println("LittleFS mount failed — upload the data folder"); return; }
 
+  size_t n = 0;
   uint32_t rate = 0;
-  for (int i = 1; i <= MAX_CUES; i++) {
-    char name[16]; snprintf(name, sizeof(name), "/cue%d.wav", i);
-    cues[i].present = false;
-    File f = LittleFS.open(name, "r");
-    if (!f) continue;
-    if (parseWav(f, cues[i]) && (rate == 0 || cues[i].rate == rate)) {
-      cues[i].present = true;
-      rate = cues[i].rate;
-      Serial.printf("%s: %lu Hz, %u ch, %.2f s\n", name, cues[i].rate, cues[i].channels,
-                    cues[i].dataLen / (2.0f * cues[i].channels * cues[i].rate));
-    } else {
-      Serial.printf("%s: skipped (needs 16-bit PCM WAV, same sample rate as others)\n", name);
+  if (!LittleFS.begin()) {
+    n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "audio: LittleFS mount failed (upload the data folder)\n");
+  } else {
+    for (int i = 1; i <= MAX_CUES; i++) {
+      char name[16]; snprintf(name, sizeof(name), "/cue%d.wav", i);
+      cues[i].present = false;
+      File f = LittleFS.open(name, "r");
+      if (!f) continue;
+      if (parseWav(f, cues[i]) && (rate == 0 || cues[i].rate == rate)) {
+        cues[i].present = true;
+        rate = cues[i].rate;
+        n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "%s: %lu Hz, %u ch, %.2f s\n", name, cues[i].rate,
+                      cues[i].channels, cues[i].dataLen / (2.0f * cues[i].channels * cues[i].rate));
+      } else {
+        n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "%s: SKIPPED (needs 16-bit PCM WAV, same rate as others)\n", name);
+      }
+      f.close();
     }
-    f.close();
   }
-  if (!rate) { Serial.println("No cue WAVs found — MIDI only"); return; }
+  if (!rate) {
+    n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "audio: NO cue WAVs found; test tone still works\n");
+    rate = 44100;                                    // start I2S anyway so the test tone works
+  }
 
   i2s.setBCLK(I2S_BCLK_PIN);
   i2s.setDATA(I2S_DATA_PIN);
   i2s.setBitsPerSample(16);
   i2s.setBuffers(4, 128);                            // ~12 ms of buffering at 44.1 kHz
-  if (!i2s.begin(rate)) { Serial.println("I2S start failed"); return; }
+  if (!i2s.begin(rate)) {
+    snprintf(audioStatus + n, sizeof(audioStatus) - n, "audio: I2S start FAILED\n");
+    return;
+  }
+  snprintf(audioStatus + n, sizeof(audioStatus) - n, "audio: I2S running at %lu Hz\n", rate);
+  audioRate = rate;
   audioReady = true;
+  Serial.print(audioStatus);
+  if (digitalRead(GO_PIN) == LOW) toneRequest = true;  // GO held at power-up = test tone
 }
 
 void loop1() {
   if (!audioReady) { pendingCue = 0; delay(5); return; }
+
+  if (toneRequest) {                       // 2 s, 1 kHz, about -6 dBFS, both channels
+    toneRequest = false;
+    bytesLeft = 0;
+    if (playing) playing.close();
+    uint32_t total = audioRate * 2;
+    uint32_t phase = 0, step = (uint32_t)((1000.0 * 4294967296.0) / audioRate);
+    for (uint32_t i = 0; i < total; i++) {
+      int16_t v = (int16_t)(16000.0f * sinf(phase * (6.2831853f / 4294967296.0f)));
+      i2s.write16(v, v);
+      phase += step;
+      if (pendingCue) break;                 // a real cue interrupts the test tone
+    }
+  }
 
   uint8_t cue = pendingCue;
   if (cue) {
