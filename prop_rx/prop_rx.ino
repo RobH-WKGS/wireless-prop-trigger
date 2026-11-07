@@ -124,7 +124,7 @@ bool     lastGo = HIGH;
 volatile uint8_t pendingCue = 0;    // written by core 0, cleared by core 1
 volatile bool    audioReady = false;
 volatile bool    toneRequest = false;  // play the 1 kHz test tone (core 1)
-char             audioStatus[320] = "audio: not started";
+char             audioStatus[512] = "audio: not started";
 
 // =====================================================================
 //  CORE 0 — radio, MIDI, panel
@@ -350,6 +350,15 @@ void setup1() {
   if (!LittleFS.begin()) {
     n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "audio: LittleFS mount failed (upload the data folder)\n");
   } else {
+    // list everything on the flash, so a wrongly named or missing file is obvious
+    n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "flash files:");
+    int count = 0;
+    Dir dir = LittleFS.openDir("/");
+    while (dir.next() && n < sizeof(audioStatus) - 40) {
+      n += snprintf(audioStatus + n, sizeof(audioStatus) - n, " %s", dir.fileName().c_str());
+      count++;
+    }
+    n += snprintf(audioStatus + n, sizeof(audioStatus) - n, count ? "\n" : " (none: data folder not uploaded)\n");
     for (int i = 1; i <= MAX_CUES; i++) {
       char name[16]; snprintf(name, sizeof(name), "/cue%d.wav", i);
       cues[i].present = false;

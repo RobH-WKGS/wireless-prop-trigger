@@ -178,7 +178,7 @@ Convert with Audacity (*Export → WAV, signed 16-bit*), or with ffmpeg:
 ffmpeg -i bang.mp3 -ar 44100 -ac 1 -sample_fmt s16 cue1.wav
 ```
 
-Put the files in a `data/` folder next to `prop_rx.ino`. Then upload them with the **arduino-littlefs-upload** IDE plugin (*Ctrl+Shift+P → "Upload LittleFS to Pico/ESP8266/ESP32"*), with the Serial Monitor closed.
+Name them exactly `cue1.wav` to `cue4.wav` (lower case); other names are ignored. Put them in a `data/` folder next to `prop_rx.ino`. Then upload them with the **arduino-littlefs-upload** IDE plugin (*Ctrl+Shift+P → "Upload LittleFS to Pico/ESP8266/ESP32"*), with the Serial Monitor closed.
 
 No sound cues wanted? Set `ENABLE_AUDIO false` and the receiver is MIDI-only.
 
