@@ -6,7 +6,7 @@
 //          Tools > Board      > "iLabs Challenger 2040 SubGHz"
 //          Tools > USB Stack  > "Adafruit TinyUSB"        <-- REQUIRED for USB MIDI
 //          Tools > Flash Size > "8MB (Sketch: 1MB, FS: 7MB)"
-//  Libs  : RFM69 (LowPowerLab), MIDI Library (FortySevenEffects)
+//  Libs  : RFM69_LowPowerLab (+ SPIFlash_LowPowerLab), MIDI Library (FortySevenEffects)
 //          (TinyUSB, I2S, LittleFS ship with the core)
 //
 //  What it does

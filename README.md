@@ -143,7 +143,7 @@ The module's **3.3V** pin is its regulator output. Use it only for XMT, not to p
    `https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json`
    Then install **"Raspberry Pi Pico/RP2040/RP2350"** (Earle Philhower) from the Boards Manager.
 2. **Libraries** (Library Manager):
-   - **RFM69** by Felix Rusu / LowPowerLab, v1.5 or newer
+   - **RFM69_LowPowerLab** (search that exact name; v1.5 or newer). Accept **Install all** so it also installs **SPIFlash_LowPowerLab**
    - **MIDI Library** by Francois Best (FortySevenEffects)
    - **Adafruit TinyUSB Library**
 3. **Board settings:**

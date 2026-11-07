@@ -5,7 +5,7 @@
 //  Core  : Earle Philhower "Raspberry Pi Pico/RP2040" (arduino-pico)
 //          Tools > Board     > "iLabs Challenger 2040 SubGHz"
 //          Tools > CPU Speed > 50 MHz  (saves battery, plenty fast)
-//  Libs  : RFM69 by LowPowerLab (v1.5+)
+//  Libs  : RFM69_LowPowerLab (v1.5+, Library Manager; "Install all" adds SPIFlash_LowPowerLab)
 //
 //  Behaviour
 //   * Button press -> sends a burst of identical TRIGGER packets
