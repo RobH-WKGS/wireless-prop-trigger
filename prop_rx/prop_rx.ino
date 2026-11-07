@@ -42,6 +42,10 @@
 // RFM69 library (LowPowerLab v1.6.0, GPL-3) is bundled in src/RFM69, patched
 // to build on the RP2040 core, which doesn't define SS for this board.
 #include "src/RFM69/RFM69.h"
+// USB MIDI needs the TinyUSB stack. Stop with a clear message if it's not selected.
+#if !defined(USE_TINYUSB)
+#error "Set Tools > USB Stack > Adafruit TinyUSB (it's on Pico SDK). Also remove any separately installed Adafruit TinyUSB library."
+#endif
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
 #include <LittleFS.h>
