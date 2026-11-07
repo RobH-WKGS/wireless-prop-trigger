@@ -139,7 +139,7 @@ PLA+ or PETG both work. PETG is tougher if the box will be knocked around backst
 | 12 mm self-adhesive rubber bumper feet | 4 |
 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 |
 | 30 mm arcade button | 1 |
-| 5 mm through-hole addressable LED (WS2812/PL9823 5 mm) | 2 |
+| Plain 5 mm LEDs (1 green, 1 red) + 220 Ω resistors | 2 each |
 | 3.5 mm stereo panel-mount jack (6 mm thread) | 1 |
 | SMA bulkhead to U.FL pigtail + 868 MHz antenna | 1 |
 | Zip ties (3 mm), foam tape, hook-and-loop strap | a few |
@@ -151,8 +151,8 @@ PLA+ or PETG both work. PETG is tougher if the box will be knocked around backst
 3. **DAC:** stick it down with foam tape between its two loops, then zip-tie it.
 4. **Back panel:** fit the SMA bulkhead and the line-out jack. Wire the jack to the DAC's **LOUT**, **ROUT** and **AGND** pins.
 5. **Lid:**
-   - Fit the ARM switch from below with its body between the rails, then the flip cover and outer nut on top. Next fit the GO button and both LEDs. SIGNAL goes on the left and TRIGGER on the right. Each LED's rim sits in its tube under the lid; add a dab of hot glue.
-   - Wire the switch, button and LEDs to the board (see the main README). The LEDs chain: SIGNAL DOUT goes to TRIGGER DIN.
+   - Fit the ARM switch from below with its body between the rails, then the flip cover and outer nut on top. Next fit the GO button and both LEDs. The green SIGNAL LED goes on the left and the red TRIGGER LED on the right. Each LED's rim sits in its tube under the lid; add a dab of hot glue.
+   - Wire the switch, button and LEDs to the board (see the main README and the receiver schematic).
    - Leave enough wire slack to open the lid fully.
 6. **Close up:** drop the lid on (the skirt locates it) and fit the four M3 × 10 screws. Don't over-tighten into the inserts.
 7. **Feet:** stick the four rubber feet into the recesses underneath.

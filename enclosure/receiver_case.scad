@@ -88,9 +88,9 @@ go_relief_d    = 46;
 go_body_d      = 33;
 go_body_depth  = 42;
 
-// 5 mm addressable LEDs: [x, y, label]
+// plain 5 mm LEDs: [x, y, label] (green SIGNAL, red TRIGGER)
 leds           = [[72, 96, "SIGNAL"], [108, 96, "TRIGGER"]];
-led_hole_d     = 5.3;    // 5 mm through-hole addressable LED
+led_hole_d     = 5.3;    // 5 mm LED
 led_rim_d      = 6.2;
 led_tube_od    = 9.5;
 led_tube_h     = 9;

@@ -49,8 +49,8 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 
 | # | Item | Qty | Notes |
 |---|------|-----|-------|
-| 13 | **5 mm through-hole addressable LED** (WS2812 / PL9823, 5 mm diffused) | 2 (+1 spare) | SIGNAL and TRIGGER LEDs, chained on one data pin. |
-| 13a | 1N4148 diode, 330 Ω resistor, 2 × 100 nF ceramic capacitors | 1 set | LED supply, data line and decoupling (see the receiver schematic). |
+| 13 | **Plain 5 mm LEDs**: 1 green, 1 red | 2 | SIGNAL (green) and TRIGGER (red). |
+| 13a | 220 Ω resistor | 2 | One per LED. |
 | 14 | **3D-printed case** (see [`enclosure/`](enclosure/README.md)) | 1 | 180 × 115 mm sloped desk console, two-colour labels. |
 | 15 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 | ARM. |
 | 16 | 30 mm arcade button | 1 | Backup GO. |
@@ -100,31 +100,28 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 | **D6** | DAC **LCK** (LRCLK, which the code drives as BCLK+1) |
 | **D9** | DAC **DIN** |
 | **3V3** | DAC **VIN** |
-| **USB (VBUS)** | **1N4148** diode (anode), cathode to **+** (VDD) on both LEDs: about 4.3 V |
-| **GND** | DAC **GND**, and **−** on both LEDs |
-| **D10** | **330 Ω** resistor → **SIGNAL** LED **DIN** |
-| SIGNAL LED **DOUT** | **TRIGGER** LED **DIN** |
+| **GND** | DAC **GND**, and both LED **cathodes** (short leg, flat side) |
+| **D10** | **220 Ω** → **green** SIGNAL LED anode (long leg) |
+| **D11** | **220 Ω** → **red** TRIGGER LED anode (long leg) |
 | **A0** | ARM switch, other leg to **GND** (closed = armed) |
 | **A1** | GO button, other leg to **GND** |
 | U.FL | Bulkhead SMA pigtail and 868 MHz antenna |
 | DAC **LOUT / ROUT / AGND** | Panel-mount line-out jack: tip / ring / sleeve |
 
-Fit a **100 nF** capacitor across each LED's + and − legs, as close to the LED as you can.
-
-**Why the diode:** 5 mm WS2812/PL9823 LEDs want about 3.5–5 V, so on 3.3 V blue and green can be dim or flaky. Straight 5 V would need a 5 V data signal. One diode drop from USB 5 V gives about 4.3 V, which drives them properly while the board's 3.3 V data still reads reliably.
-
-**5 mm LED pins:** most WS2812 / PL9823 5 mm LEDs are **DIN, VDD (+), GND, DOUT** from the flat side, with VDD the longest leg. Check your seller's pinout. If red and green show swapped, change `NEO_GRB` to `NEO_RGB` in `prop_rx.ino`.
+**LED resistors:** 220 Ω gives about 5 mA, plenty for a panel indicator. Brightness is also set in software with `LED_BRIGHTNESS`, so you can dim them for a dark backstage. A bright "pure green" LED can look dim on 3.3 V; drop its resistor to 100 Ω. Keep the red at 220 Ω or more.
 
 **What the LEDs show:**
 
 | LED | Colour | Meaning |
 |---|---|---|
-| **SIGNAL** | red | No prop heard for 3 s (off, flat, or out of range) |
-| | blue | Prop connected, receiver **disarmed** |
-| | green | Prop connected, receiver **armed** |
-| | amber blink | Prop battery low |
-| **TRIGGER** (1 s) | white | Cue fired (prop or GO) |
-| | magenta | Prop pressed while **disarmed**; nothing fired |
+| **SIGNAL** (green) | off | No prop heard for 3 s (off, flat, or out of range) |
+| | solid | Prop connected, good signal |
+| | slow blink | Prop connected, weak signal (worse than −90 dBm) |
+| | fast blink | Prop battery low |
+| **TRIGGER** (red) | solid for 1 s | Cue fired (prop or GO) |
+| | flicker for 1 s | Prop pressed while **disarmed**; nothing fired |
+
+Both LEDs light for half a second at power-up as a lamp test. Both blinking together means the radio failed to start. Whether the receiver is armed shows on the flight switch itself.
 
 **PCM5102A jumpers:** most GY-PCM5102 boards need **SCK tied to GND**, either via the solder pad or the SCK pin. Then use the solder pads on the back to set **FLT, DEMP and FMT low and XSMT high**. Check your board's silkscreen, because the pad numbering varies between sellers. If you get no audio or a buzz, this is the first thing to check.
 
@@ -138,7 +135,6 @@ Fit a **100 nF** capacitor across each LED's + and − legs, as close to the LED
 2. **Libraries** (Library Manager):
    - **RFM69** by Felix Rusu / LowPowerLab, v1.5 or newer
    - **MIDI Library** by Francois Best (FortySevenEffects)
-   - **Adafruit NeoPixel**
    - **Adafruit TinyUSB Library**
 3. **Board settings:**
 
@@ -182,10 +178,10 @@ No sound cues wanted? Set `ENABLE_AUDIO false` and the receiver is MIDI-only.
 
 ## Bench test
 
-1. Power the receiver over USB. **SIGNAL** should go **red** (no prop yet).
-2. Switch the prop on. **SIGNAL** turns **blue** (prop alive, disarmed).
-3. Press the prop button. **TRIGGER** lights **magenta** for 1 s and nothing fires. The Serial Monitor prints the RSSI.
-4. Flip ARM. **SIGNAL** turns **green**. Press the prop button: **TRIGGER** lights **white** for 1 s, the MIDI note goes out, the WAV plays, and the Titan cue goes.
+1. Power the receiver over USB. Both LEDs flash on briefly, then **SIGNAL** stays off (no prop yet).
+2. Switch the prop on. **SIGNAL** comes on solid (prop connected).
+3. With ARM off, press the prop button. **TRIGGER** flickers for 1 s and nothing fires. The Serial Monitor prints the RSSI.
+4. Flip ARM. Press the prop button: **TRIGGER** lights solid for 1 s, the MIDI note goes out, the WAV plays, and the Titan cue goes.
 5. Press the prop button twice quickly. Only the first press fires, and the Serial Monitor logs the second as ignored. Wait a second and it fires again.
 6. Press the receiver's **GO** button. The same cue fires.
 7. **Range test in the real room**, with the actor's hand wrapped around the prop, from every position they'll use it. The Serial Monitor shows RSSI once a second:
@@ -196,8 +192,8 @@ No sound cues wanted? Set `ENABLE_AUDIO false` and the receiver is MIDI-only.
 ## Show-day checklist
 
 - [ ] Prop LiPo charged, plus a spare in the corner
-- [ ] **SIGNAL** LED **blue** when the prop is switched on in the wings. A test press lights **TRIGGER** magenta
-- [ ] **ARM** flipped when the scene starts. **SIGNAL** LED **green**
+- [ ] **SIGNAL** LED **solid** when the prop is switched on in the wings (not blinking). A test press makes **TRIGGER** flicker
+- [ ] **ARM** flipped when the scene starts
 - [ ] Operator knows: no cue within ~½ s of the moment → hit **GO** (receiver) or the cue's GO on Titan
 - [ ] **Disarm** after the scene, so the button is safe for the rest of the show
 

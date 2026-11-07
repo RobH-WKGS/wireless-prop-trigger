@@ -6,8 +6,8 @@
 //          Tools > Board      > "iLabs Challenger 2040 SubGHz"
 //          Tools > USB Stack  > "Adafruit TinyUSB"        <-- REQUIRED for USB MIDI
 //          Tools > Flash Size > "8MB (Sketch: 1MB, FS: 7MB)"
-//  Libs  : RFM69 (LowPowerLab), MIDI Library (FortySevenEffects),
-//          Adafruit NeoPixel  (TinyUSB, I2S, LittleFS ship with the core)
+//  Libs  : RFM69 (LowPowerLab), MIDI Library (FortySevenEffects)
+//          (TinyUSB, I2S, LittleFS ship with the core)
 //
 //  What it does
 //   Core 0: listens for prop packets -> sends a USB MIDI note to Titan
@@ -17,30 +17,31 @@
 //           within ~12 ms, not after a DAC wake-up.
 //
 //  Panel controls
-//   ARM switch  (A0 -> GND = armed). Disarmed: prop presses light the
-//               TRIGGER LED magenta but fire NOTHING — lets the actor test
-//               the prop in the wings.
+//   ARM switch  (A0 -> GND = armed). Disarmed: prop presses flash the
+//               TRIGGER LED but fire NOTHING — lets the actor test the
+//               prop in the wings.
 //   GO button   (A1 -> GND). Operator backup: fires cue 1 (MIDI + audio)
 //               whether armed or not.
 //   A cue can fire at most once per second (MIN_TRIGGER_GAP_MS), whatever
 //   fires it — prop, GO, or both together never double-fire.
 //
-//  Two 5 mm addressable LEDs, chained on D10 (LED 1 DOUT -> LED 2 DIN)
-//   SIGNAL  (LED 1) — connection to the prop
-//     red          no prop heard for 3 s (off / flat battery / out of range)
-//     green        prop alive, ARMED
-//     blue         prop alive, disarmed (test mode)
-//     amber blink  prop battery low
-//   TRIGGER (LED 2) — on for 1 s each time the prop is pressed
-//     white        cue fired (prop or GO button)
-//     magenta      prop pressed while DISARMED (nothing fired)
+//  Two plain 5 mm LEDs, each on its own pin through a 220 ohm resistor
+//   SIGNAL  (green, D10) — link to the prop
+//     off          no prop heard for 3 s (off / flat battery / out of range)
+//     solid        prop connected, good signal
+//     slow blink   prop connected, weak signal (RSSI below WEAK_RSSI)
+//     fast blink   prop battery low
+//   TRIGGER (red, D11) — 1 s each time the prop is pressed
+//     solid 1 s    cue fired (prop or GO button)
+//     flicker 1 s  prop pressed while DISARMED (nothing fired)
+//   Both on for half a second at power-up (lamp test). Both blinking
+//   together fast = radio fault. ARM state shows on the flight switch.
 // =====================================================================
 
 #include <SPI.h>
 #include <RFM69.h>
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
-#include <Adafruit_NeoPixel.h>
 #include <LittleFS.h>
 #include <I2S.h>
 
@@ -66,9 +67,10 @@
 // ---------- Panel ----------------------------------------------------
 #define ARM_PIN        A0
 #define GO_PIN         A1
-#define PIXEL_PIN      D10         // data in of LED 1 (SIGNAL); LED 2 (TRIGGER) chains from it
-#define PX_SIGNAL      0
-#define PX_TRIGGER     1
+#define SIGNAL_LED_PIN  D10        // green LED (GPIO5) via 220 ohm to GND
+#define TRIGGER_LED_PIN D11        // red LED (GPIO6) via 220 ohm to GND
+#define LED_BRIGHTNESS  120        // 0-255 PWM; lower for a dark backstage
+#define WEAK_RSSI       -90        // dBm; weaker than this = slow blink
 #define TRIGGER_LED_MS 1000        // how long the TRIGGER LED stays lit
 #define MIN_TRIGGER_GAP_MS 1000    // a cue can't fire again within this time
 
@@ -92,9 +94,6 @@ struct __attribute__((packed)) Packet {
 RFM69 radio(RFM_CS, RFM_IRQ, true, &SPI1);
 Adafruit_USBD_MIDI usbMidi;
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usbMidi, MIDI);
-// 5 mm WS2812/PL9823 LEDs are often RGB order rather than GRB: if red and
-// green look swapped, change NEO_GRB to NEO_RGB.
-Adafruit_NeoPixel pixel(2, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 // ---------- State (core 0) -------------------------------------------
 struct NodeState { uint32_t lastHeard; uint8_t lastSeq; uint32_t lastSeqAt; uint16_t battMv; int16_t rssi; };
@@ -103,7 +102,7 @@ uint32_t noteOffAt[MAX_CUES + 1] = {0};
 uint32_t lastFireAt[MAX_CUES + 1] = {0};
 bool     everFired[MAX_CUES + 1] = {false};
 uint32_t trigLedUntil = 0;
-uint32_t trigLedColour = 0;
+bool     trigLedFlicker = false;      // false = solid (fired), true = flicker (disarmed press)
 uint32_t lastDisarmedFlash = 0;
 bool     lastGo = HIGH;
 
@@ -114,8 +113,8 @@ volatile bool    audioReady = false;
 // =====================================================================
 //  CORE 0 — radio, MIDI, panel
 // =====================================================================
-void lightTrigger(uint32_t colour) {
-  trigLedColour = colour;
+void lightTrigger(bool flicker) {
+  trigLedFlicker = flicker;
   trigLedUntil  = millis() + TRIGGER_LED_MS;
 }
 
@@ -133,7 +132,7 @@ void fireCue(uint8_t cue, const char *source) {
   MIDI.sendNoteOn(note, 127, MIDI_CHANNEL);
   noteOffAt[cue] = now + NOTE_LENGTH_MS;
   if (ENABLE_AUDIO) pendingCue = cue;
-  lightTrigger(pixel.Color(255, 255, 255));
+  lightTrigger(false);
   Serial.printf("[%lu] FIRE cue %u (note %u) from %s\n", now, cue, note, source);
 }
 
@@ -160,37 +159,41 @@ void handlePacket(uint16_t sender, const Packet &p, int16_t rssi) {
     // same 1-per-second limit applies to the test flash
     if (now - lastDisarmedFlash >= MIN_TRIGGER_GAP_MS) {
       lastDisarmedFlash = now;
-      lightTrigger(pixel.Color(255, 0, 255));
+      lightTrigger(true);
     }
     Serial.printf("[%lu] Press from prop %u ignored (DISARMED), RSSI %d\n", now, sender, rssi);
   }
 }
 
+void setLed(uint8_t pin, bool on) {
+  static int8_t shown[32];                 // avoid re-writing PWM every loop
+  int8_t v = on ? 1 : 0;
+  if (shown[pin] == v + 1) return;
+  shown[pin] = v + 1;
+  analogWrite(pin, on ? LED_BRIGHTNESS : 0);
+}
+
 void updateLeds() {
   uint32_t now = millis();
-  uint32_t c;
-  {
-    bool alive = false, lowBatt = false;
-    for (int i = 2; i < 8; i++) {
-      if (nodes[i].lastHeard && (now - nodes[i].lastHeard) < PROP_TIMEOUT_MS) {
-        alive = true;
-        if (nodes[i].battMv && nodes[i].battMv < LOW_BATT_MV) lowBatt = true;
-      }
+  bool alive = false, lowBatt = false, weak = false;
+  for (int i = 2; i < 8; i++) {
+    if (nodes[i].lastHeard && (now - nodes[i].lastHeard) < PROP_TIMEOUT_MS) {
+      alive = true;
+      if (nodes[i].battMv && nodes[i].battMv < LOW_BATT_MV) lowBatt = true;
+      if (nodes[i].rssi < WEAK_RSSI) weak = true;
     }
-    bool armed = (digitalRead(ARM_PIN) == LOW);
-    if (!alive)                          c = pixel.Color(255, 0, 0);
-    else if (lowBatt && (now / 400) % 2) c = pixel.Color(255, 120, 0);
-    else if (armed)                      c = pixel.Color(0, 255, 0);
-    else                                 c = pixel.Color(0, 0, 255);
   }
-  uint32_t t = ((int32_t)(trigLedUntil - now) > 0) ? trigLedColour : 0;
-  static uint32_t shownSig = 1, shownTrig = 1;
-  if (c != shownSig || t != shownTrig) {
-    pixel.setPixelColor(PX_SIGNAL, c);
-    pixel.setPixelColor(PX_TRIGGER, t);
-    pixel.show();
-    shownSig = c; shownTrig = t;
-  }
+  bool sig;
+  if (!alive)        sig = false;
+  else if (lowBatt)  sig = (now / 125) % 2;   // fast blink, 4 Hz
+  else if (weak)     sig = (now / 500) % 2;   // slow blink, 1 Hz
+  else               sig = true;
+  setLed(SIGNAL_LED_PIN, sig);
+
+  bool trig = false;
+  if ((int32_t)(trigLedUntil - now) > 0)
+    trig = trigLedFlicker ? (now / 60) % 2 : true;
+  setLed(TRIGGER_LED_PIN, trig);
 }
 
 void setup() {
@@ -206,20 +209,22 @@ void setup() {
   pinMode(ARM_PIN, INPUT_PULLUP);
   pinMode(GO_PIN, INPUT_PULLUP);
 
-  pixel.begin();
-  pixel.setBrightness(25);                           // backstage-friendly
-  pixel.setPixelColor(PX_SIGNAL, pixel.Color(255, 0, 0));
-  pixel.setPixelColor(PX_TRIGGER, 0);
-  pixel.show();
+  pinMode(SIGNAL_LED_PIN, OUTPUT);
+  pinMode(TRIGGER_LED_PIN, OUTPUT);
+  analogWrite(SIGNAL_LED_PIN, LED_BRIGHTNESS);       // lamp test: both on briefly
+  analogWrite(TRIGGER_LED_PIN, LED_BRIGHTNESS);
+  delay(500);
+  analogWrite(SIGNAL_LED_PIN, 0);
+  analogWrite(TRIGGER_LED_PIN, 0);
 
   pinMode(RFM_RST, OUTPUT);
   digitalWrite(RFM_RST, HIGH); delay(10);
   digitalWrite(RFM_RST, LOW);  delay(10);
 
   if (!radio.initialize(RF69_868MHZ, RX_NODE_ID, NETWORK_ID)) {
-    while (true) {                                   // radio fault: fast red/off blink
-      uint32_t on = (millis() / 100) % 2 ? pixel.Color(255, 0, 0) : 0;
-      pixel.setPixelColor(PX_SIGNAL, on); pixel.setPixelColor(PX_TRIGGER, on); pixel.show();
+    while (true) {                                   // radio fault: both LEDs blink together
+      int v = (millis() / 100) % 2 ? LED_BRIGHTNESS : 0;
+      analogWrite(SIGNAL_LED_PIN, v); analogWrite(TRIGGER_LED_PIN, v);
       delay(50);
     }
   }
