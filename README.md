@@ -142,10 +142,12 @@ The module's **3.3V** pin is its regulator output. Use it only for XMT, not to p
 1. **Arduino IDE 2.x**. In *Preferences → Additional boards URLs*, add:
    `https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json`
    Then install **"Raspberry Pi Pico/RP2040/RP2350"** (Earle Philhower) from the Boards Manager.
-2. **Libraries** (Library Manager):
-   - **RFM69_LowPowerLab** (search that exact name; v1.5 or newer). Accept **Install all** so it also installs **SPIFlash_LowPowerLab**
-   - **MIDI Library** by Francois Best (FortySevenEffects)
-   - **Adafruit TinyUSB Library**
+2. **Libraries** (Library Manager): only **MIDI Library** by Francois Best (FortySevenEffects), for the receiver.
+   - The **RFM69** radio library is **bundled** inside each sketch (`src/RFM69`). It's LowPowerLab's v1.6.0 (GPL-3) with a one-line patch so it builds on the RP2040 core. You don't need to install it, and an installed copy won't interfere.
+   - **TinyUSB**, I2S and LittleFS come with the RP2040 board package. Don't install Adafruit TinyUSB separately; a second copy can clash with the bundled one.
+   - Keep each sketch's `src` folder next to its `.ino` file when you copy or download them.
+
+   Both sketches have been test-compiled with arduino-pico 6.3.2 for the Challenger 2040 SubGHz, with no errors or warnings.
 3. **Board settings:**
 
    | Setting | Prop | Receiver |

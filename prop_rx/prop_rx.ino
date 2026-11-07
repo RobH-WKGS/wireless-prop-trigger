@@ -6,7 +6,7 @@
 //          Tools > Board      > "iLabs Challenger 2040 SubGHz"
 //          Tools > USB Stack  > "Adafruit TinyUSB"        <-- REQUIRED for USB MIDI
 //          Tools > Flash Size > "8MB (Sketch: 1MB, FS: 7MB)"
-//  Libs  : RFM69_LowPowerLab (+ SPIFlash_LowPowerLab), MIDI Library (FortySevenEffects)
+//  Libs  : MIDI Library (FortySevenEffects). RFM69 (LowPowerLab, GPL-3) is bundled in src/RFM69
 //          (TinyUSB, I2S, LittleFS ship with the core)
 //
 //  What it does
@@ -39,7 +39,9 @@
 // =====================================================================
 
 #include <SPI.h>
-#include <RFM69.h>
+// RFM69 library (LowPowerLab v1.6.0, GPL-3) is bundled in src/RFM69, patched
+// to build on the RP2040 core, which doesn't define SS for this board.
+#include "src/RFM69/RFM69.h"
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
 #include <LittleFS.h>
@@ -96,6 +98,14 @@ Adafruit_USBD_MIDI usbMidi;
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usbMidi, MIDI);
 
 // ---------- State (core 0) -------------------------------------------
+// WAV cue info (declared up here so the IDE's auto-generated prototypes can see it)
+struct Cue {
+  bool     present;
+  uint16_t channels;
+  uint32_t rate;
+  uint32_t dataStart;
+  uint32_t dataLen;
+};
 struct NodeState { uint32_t lastHeard; uint8_t lastSeq; uint32_t lastSeqAt; uint16_t battMv; int16_t rssi; };
 NodeState nodes[8];                 // index = sender node id (2..7 used)
 uint32_t noteOffAt[MAX_CUES + 1] = {0};
@@ -276,13 +286,6 @@ void loop() {
 // =====================================================================
 //  CORE 1 — WAV playback to I2S
 // =====================================================================
-struct Cue {
-  bool     present;
-  uint16_t channels;
-  uint32_t rate;
-  uint32_t dataStart;
-  uint32_t dataLen;
-};
 Cue cues[MAX_CUES + 1];
 I2S i2s(OUTPUT);
 File playing;

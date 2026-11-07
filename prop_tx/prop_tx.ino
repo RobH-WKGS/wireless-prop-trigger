@@ -5,7 +5,7 @@
 //  Core  : Earle Philhower "Raspberry Pi Pico/RP2040" (arduino-pico)
 //          Tools > Board     > "iLabs Challenger 2040 SubGHz"
 //          Tools > CPU Speed > 50 MHz  (saves battery, plenty fast)
-//  Libs  : RFM69_LowPowerLab (v1.5+, Library Manager; "Install all" adds SPIFlash_LowPowerLab)
+//  Libs  : none to install. RFM69 (LowPowerLab, GPL-3) is bundled in src/RFM69
 //
 //  Behaviour
 //   * Button press -> sends a burst of identical TRIGGER packets
@@ -17,7 +17,9 @@
 // =====================================================================
 
 #include <SPI.h>
-#include <RFM69.h>
+// RFM69 library (LowPowerLab v1.6.0, GPL-3) is bundled in src/RFM69, patched
+// to build on the RP2040 core, which doesn't define SS for this board.
+#include "src/RFM69/RFM69.h"
 
 #if !defined(ARDUINO_CHALLENGER_2040_SUBGHZ_RP2040)
   #warning "Written for the iLabs Challenger 2040 SubGHz — check the radio pin defines below"
