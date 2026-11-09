@@ -17,11 +17,12 @@
 //           within ~12 ms, not after a DAC wake-up.
 //
 //  Panel controls
-//   ARM switch  (A0 -> GND = armed). Disarmed: prop presses flash the
-//               TRIGGER LED but fire NOTHING — lets the actor test the
-//               prop in the wings.
+//   ARM switch  (A0 -> GND = armed). DISARMED = SAFE: nothing goes to
+//               Titan or the sound desk. Prop and GO presses only flicker
+//               the TRIGGER LED, and the n / t test commands are refused.
+//               Lets the actor test the prop in the wings.
 //   GO button   (A1 -> GND). Operator backup: fires cue 1 (MIDI + audio)
-//               whether armed or not.
+//               when ARMED.
 //   A cue can fire at most once per second (MIN_TRIGGER_GAP_MS), whatever
 //   fires it — prop, GO, or both together never double-fire.
 //
@@ -178,6 +179,8 @@ void printHelp() {
   Serial.println("Commands: h help | m MIDI/USB status | n send test MIDI note | s audio status | t test tone");
 }
 
+bool isArmed() { return digitalRead(ARM_PIN) == LOW; }
+
 void lightTrigger(bool flicker) {
   trigLedFlicker = flicker;
   trigLedUntil  = millis() + TRIGGER_LED_MS;
@@ -216,7 +219,7 @@ void handlePacket(uint16_t sender, const Packet &p, int16_t rssi) {
   n.lastSeq = p.seq;
   n.lastSeqAt = now;
 
-  bool armed = (digitalRead(ARM_PIN) == LOW);
+  bool armed = isArmed();
   if (armed) {
     char src[32]; snprintf(src, sizeof(src), "PROP %u (node %u, RSSI %d)", sender == PROP2_NODE ? 2 : 1, sender, rssi);
     fireCue(p.cue, src);
@@ -321,13 +324,17 @@ void loop() {
     if (c == 'h' || c == 'H' || c == '?') printHelp();
     else if (c == 'm' || c == 'M') printMidiStatus();
     else if (c == 'n' || c == 'N') {             // test note for Titan Learn: no audio, no lockout
-      Serial.println("test MIDI note (no audio):");
-      midiNote(true, MIDI_BASE_NOTE, 127);
-      noteOffAt[1] = millis() + NOTE_LENGTH_MS;
+      if (!isArmed()) Serial.println("test MIDI note refused: DISARMED (flip ARM to send)");
+      else {
+        Serial.println("test MIDI note (no audio):");
+        midiNote(true, MIDI_BASE_NOTE, 127);
+        noteOffAt[1] = millis() + NOTE_LENGTH_MS;
+      }
     }
     else if (c == 's' || c == 'S') { Serial.print(audioStatus); Serial.println(); }
     else if (c == 't' || c == 'T') {
-      if (audioReady) { toneRequest = true; Serial.println("test tone: 1 kHz for 2 s"); }
+      if (!isArmed())      Serial.println("test tone refused: DISARMED (flip ARM to play)");
+      else if (audioReady) { toneRequest = true; Serial.println("test tone: 1 kHz for 2 s"); }
       else            { Serial.print("test tone unavailable: "); Serial.print(audioStatus); Serial.println(); }
     }
   }
@@ -343,7 +350,16 @@ void loop() {
 
   // Operator backup GO button (always live)
   bool g = digitalRead(GO_PIN);
-  if (g == LOW && lastGo == HIGH) fireCue(1, "panel GO");   // fireCue enforces the 1 s limit
+  if (g == LOW && lastGo == HIGH) {
+    if (isArmed()) fireCue(1, "panel GO");               // fireCue enforces the 1 s limit
+    else {
+      if (millis() - lastDisarmedFlash >= MIN_TRIGGER_GAP_MS) {
+        lastDisarmedFlash = millis();
+        lightTrigger(true);                              // same flicker as a disarmed prop press
+      }
+      Serial.printf("[%lu] GO ignored (DISARMED)\n", millis());
+    }
+  }
   lastGo = g;
 
   uint32_t now = millis();
@@ -466,7 +482,8 @@ void setup1() {
   audioRate = rate;
   audioReady = true;
   Serial.print(audioStatus);
-  if (digitalRead(GO_PIN) == LOW) toneRequest = true;  // GO held at power-up = test tone
+  pinMode(ARM_PIN, INPUT_PULLUP);
+  if (digitalRead(GO_PIN) == LOW && digitalRead(ARM_PIN) == LOW) toneRequest = true;  // ARMED + GO held at power-up = test tone
 }
 
 void loop1() {

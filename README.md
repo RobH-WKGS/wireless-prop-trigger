@@ -18,7 +18,7 @@ Every unit uses the same board, the **iLabs Challenger RP2040 SubGHz 868 MHz**. 
 - **Heartbeat:** the prop reports once a second, with battery voltage. The receiver's **SIGNAL** LED tells you it's alive *before* the scene.
 - **Trigger feedback:** the receiver's **TRIGGER** LED lights for 1 second every time the prop is pressed.
 - **Rate limit:** a cue fires at most **once per second**. The prop won't send faster than that, and the receiver ignores anything sooner too, including the prop and GO pressed together.
-- **Safety:** an ARM switch on the receiver means nothing fires while you're testing the prop in the wings. A GO button on the receiver is the operator's backup.
+- **Safety:** with the receiver's ARM switch **off, nothing goes to Titan or the sound desk**: not the props, not the GO button, not the test commands. Presses just flicker the TRIGGER LED, so the actor can test a prop in the wings. When armed, the GO button is the operator's backup.
 
 > ⚠️ **Not yet compiled.** I checked the library calls and the board's pin map against their source, but couldn't run the compiler in my environment. Expect possibly a small fix or two on the first compile. Bench-test before rehearsal.
 
@@ -121,7 +121,7 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 | | slow blink | Prop connected, weak signal (worse than −90 dBm) |
 | | fast blink | That prop's battery is low |
 | **TRIGGER** (red) | solid for 1 s | Cue fired (either prop, or GO) |
-| | flicker for 1 s | A prop pressed while **disarmed**; nothing fired |
+| | flicker for 1 s | A prop or GO pressed while **disarmed**; nothing fired |
 | | 2 short blips every 3 s | **No USB host: no MIDI link.** Charge-only cable, PC off, or USB not enumerating |
 
 All three LEDs light for half a second at power-up as a lamp test. All blinking together means the radio failed to start. Whether the receiver is armed shows on the flight switch itself.
@@ -140,7 +140,7 @@ All three LEDs light for half a second at power-up as a lamp test. All blinking 
 
 **No audio? Test the DAC on its own** (Serial Monitor at any baud rate, receiver on USB):
 - Type **`s`** to print the audio status: which `cueN.wav` files were found, and whether I2S is running.
-- Type **`t`** to play a **1 kHz test tone** for 2 seconds. Without a laptop, **hold GO while powering up** for the same tone.
+- With **ARM on**, type **`t`** to play a **1 kHz test tone** for 2 seconds. Without a laptop, power up with **ARM on and GO held** for the same tone. Disarmed, the tone is refused so nothing reaches the sound desk.
 - Tone but no cue sound → the WAV files aren't loaded or aren't 16-bit PCM. Re-upload the `data` folder.
 - No tone either → check the DAC wiring: XMT high, FLT/DMP/SCL/FMT to GND, 3.3 V on the module's 3.3V pin, and BCK/LCK/DIN on D5/D6/D9.
 
@@ -202,9 +202,9 @@ Open the Arduino Serial Monitor (any baud rate) with the receiver plugged into t
 1. **Is USB connected?** Type **`m`**.
    - "USB: NOT connected" means the PC isn't talking to the receiver. The red TRIGGER LED also gives **two short blips every 3 s**. Usually it's a **charge-only cable**: swap it for a known data cable (one that works for file transfer to a phone). A USB hub or front-panel port can also be at fault, so try a rear port.
    - If the Serial Monitor itself can't see the board, that alone suggests a charge-only cable.
-2. **Is the note leaving the receiver?** Every MIDI message is logged, e.g. `MIDI OUT note-on ch 1 note 60 (C4) vel 127 [USB host connected]`. Type **`n`** to send a **test note** on its own: no audio, and no one-second lockout, so it's ideal for Titan's **Learn**.
+2. **Is the note leaving the receiver?** Every MIDI message is logged, e.g. `MIDI OUT note-on ch 1 note 60 (C4) vel 127 [USB host connected]`. With **ARM on**, type **`n`** to send a **test note** on its own: no audio, and no one-second lockout, so it's ideal for Titan's **Learn**. Disarmed, it's refused.
 3. **Is Windows seeing it?** Check that **"Prop Trigger"** appears as a MIDI device (Device Manager → Sound, video and game controllers). A free MIDI monitor such as **MIDI-OX** or **MIDIView** should show the note when you type `n`. **Close the monitor afterwards**, because Windows lets only one program open a MIDI input at a time. Restart Titan if it was open while the monitor had the port.
-4. **Is Titan listening?** Titan only picks up MIDI devices present when it starts, so plug the receiver in **before** starting Titan. Check the device is enabled as a MIDI input in Titan's settings, then redo the trigger's Learn using `n`.
+4. **Is Titan listening?** Titan only picks up MIDI devices present when it starts, so plug the receiver in **before** starting Titan. Check the device is enabled as a MIDI input in Titan's settings, then redo the trigger's Learn using `n` (with ARM on).
 5. **Messages *from* the PC** are logged as `MIDI IN …`. If Titan or a MIDI tool sends anything, you'll see it, which proves the link works both ways.
 
 ---
@@ -216,7 +216,7 @@ Open the Arduino Serial Monitor (any baud rate) with the receiver plugged into t
 3. With ARM off, press each prop's button. **TRIGGER** flickers for 1 s and nothing fires. The Serial Monitor names the prop and prints its RSSI.
 4. Flip ARM. Press each prop's button in turn, more than a second apart: **TRIGGER** lights solid for 1 s, the MIDI note goes out, the WAV plays, and the Titan cue goes.
 5. Press the prop button twice quickly. Only the first press fires, and the Serial Monitor logs the second as ignored. Wait a second and it fires again.
-6. Press the receiver's **GO** button. The same cue fires.
+6. Press the receiver's **GO** button: the same cue fires. Flip ARM off and press GO again: **TRIGGER** flickers, nothing fires, and the Serial Monitor logs `GO ignored (DISARMED)`.
 7. **Range test in the real room**, with the actor's hand wrapped around the prop, from every position they'll use it. The Serial Monitor shows both props' RSSI every 2 s:
    - **-50 to -80 dBm:** comfortable.
    - **Worse than -90 dBm:** move the receiver antenna, reroute the prop antenna, or raise `TX_POWER_DBM` up to 14.
@@ -228,7 +228,7 @@ Open the Arduino Serial Monitor (any baud rate) with the receiver plugged into t
 - [ ] Receiver plugged into the lighting PC **before Titan starts**. **TRIGGER** not double-blipping (USB OK)
 - [ ] **SIGNAL 1** and **SIGNAL 2** **solid** when the props are switched on in the wings (not blinking). A test press on each makes **TRIGGER** flicker
 - [ ] **ARM** flipped when the scene starts
-- [ ] Operator knows: no cue within ~½ s of the moment → hit **GO** (receiver) or the cue's GO on Titan
+- [ ] Operator knows: no cue within ~½ s of the moment → hit **GO** (receiver, only works when armed) or the cue's GO on Titan
 - [ ] **Disarm** after the scene, so the button is safe for the rest of the show
 
 ---
