@@ -210,10 +210,9 @@ Open the Arduino Serial Monitor (any baud rate) with the receiver plugged into t
 3. **Is Windows seeing it?** Check that **"Prop Trigger"** appears as a MIDI device (Device Manager → Sound, video and game controllers). A free MIDI monitor such as **MIDI-OX** or **MIDIView** should show the note when you type `n`. **Close the monitor afterwards**, because Windows lets only one program open a MIDI input at a time. Restart Titan if it was open while the monitor had the port.
 4. **Is Titan listening?** Titan only picks up MIDI devices present when it starts, so plug the receiver in **before** starting Titan. Check the device is enabled as a MIDI input in Titan's settings, then redo the trigger's Learn using `n` (with ARM on).
 5. **Messages *from* the PC** are logged as `MIDI IN …`. If Titan or a MIDI tool sends anything, you'll see it, which proves the link works both ways.
-6. **Receiver not listed in USB Expert → Connected Panels?** Titan's USB service hasn't picked it up.
-   - With the receiver plugged in, use **Tools → Acw Service** to restart the service (or **Reset** / **Cycle USB Ports**), then restart Titan.
-   - Still missing: set `USB_MIDI_ONLY true` in `prop_rx.ino` and upload. The receiver then appears as a plain MIDI-only device with no serial port, which some hardware-focused USB services need. Serial Monitor diagnostics stop in this mode; the LEDs still work. To upload again afterwards, **hold the board's BOOT button while plugging in USB**, because there's no serial port for the IDE to reset.
-   - Note that USB Expert's **Watch MIDI** shows the MIDI of the panel selected in Connected Panels. Select the receiver's entry once it appears, not "Mobile DMX".
+6. **Don't use USB Expert for this.** Titan reads USB MIDI through Windows' own MIDI devices, not through the Avolites USB service. The receiver won't appear in USB Expert's Connected Panels, and its Watch MIDI only shows Avolites panels ([Avolites manual: External triggering](https://manual.avolites.com/docs/running-the-show/midi-dmx-or-audio-triggering/)). Test with MIDI-OX and the Triggers window's Learn instead.
+7. **Titan only opens MIDI devices when it starts.** Every time the receiver is plugged in, reset, or re-uploaded, Windows sees it as a new device. **Restart Titan afterwards.**
+8. **Last resort:** `USB_MIDI_ONLY true` in `prop_rx.ino` makes the receiver a MIDI-only USB device with no serial port. To upload again afterwards, **hold BOOT while plugging in USB** and pick the **UF2** port in Tools → Port.
 
 ---
 
