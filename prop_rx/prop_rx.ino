@@ -5,7 +5,8 @@
 //  Core  : Earle Philhower "Raspberry Pi Pico/RP2040" (arduino-pico)
 //          Tools > Board      > "iLabs Challenger 2040 SubGHz"
 //          Tools > USB Stack  > "Adafruit TinyUSB"        <-- REQUIRED for USB MIDI
-//          Tools > Flash Size > "8MB (Sketch: 1MB, FS: 7MB)"
+//          Tools > Flash Size > "8MB (Sketch: 6MB, FS: 2MB)"  (same setting for the
+//          sketch upload AND the LittleFS data upload, or the files are not found)
 //  Libs  : MIDI Library (FortySevenEffects). RFM69 (LowPowerLab, GPL-3) is bundled in src/RFM69
 //          (TinyUSB, I2S, LittleFS ship with the core)
 //
@@ -437,7 +438,12 @@ void setup1() {
 
   size_t n = 0;
   uint32_t rate = 0;
-  if (!LittleFS.begin()) {
+  // Filesystem size comes from Tools > Flash Size. "no FS" (the board's default) = nowhere for WAVs.
+  extern uint8_t _FS_start, _FS_end;
+  uint32_t fsBytes = (uint32_t)(&_FS_end - &_FS_start);
+  n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "filesystem: %lu KB%s\n", fsBytes / 1024,
+                fsBytes ? "" : " -- Tools > Flash Size has NO FS: pick one with FS, re-upload sketch AND data");
+  if (!fsBytes || !LittleFS.begin()) {
     n += snprintf(audioStatus + n, sizeof(audioStatus) - n, "audio: LittleFS mount failed (upload the data folder)\n");
   } else {
     // list everything on the flash, so a wrongly named or missing file is obvious

@@ -163,7 +163,7 @@ All three LEDs light for half a second at power-up as a lamp test. All blinking 
    |---|---|---|
    | Board | **iLabs Challenger 2040 SubGHz** | **iLabs Challenger 2040 SubGHz** |
    | USB Stack | (default) | **Adafruit TinyUSB** |
-   | Flash Size | (default) | **8MB (Sketch: 1MB, FS: 7MB)** |
+   | Flash Size | (default) | **8MB (Sketch: 6MB, FS: 2MB)** |
    | CPU Speed | 50 MHz (saves battery) | (default) |
 
    **First upload:** hold **BOOT** while plugging in USB, then pick the UF2 port. After that, normal uploads work.
@@ -173,7 +173,7 @@ All three LEDs light for half a second at power-up as a lamp test. All blinking 
 
 ### Sound files
 
-The receiver plays `/cue1.wav` … `/cue4.wav` from its flash. They must be **16-bit PCM WAV**, all at the **same sample rate** (44.1 kHz recommended), mono or stereo. Roughly 40 s of 44.1 kHz stereo or 80 s of mono fits.
+The receiver plays `/cue1.wav` … `/cue4.wav` from its flash. They must be **16-bit PCM WAV**, all at the **same sample rate** (44.1 kHz recommended), mono or stereo. A 2 MB filesystem holds roughly 11 s of 44.1 kHz stereo or 23 s of mono. For longer effects pick a bigger FS in **Flash Size**, at the cost of slower data uploads.
 
 Convert with Audacity (*Export → WAV, signed 16-bit*), or with ffmpeg:
 
@@ -182,6 +182,10 @@ ffmpeg -i bang.mp3 -ar 44100 -ac 1 -sample_fmt s16 cue1.wav
 ```
 
 Name them exactly `cue1.wav` to `cue4.wav` (lower case); other names are ignored. Put them in a `data/` folder next to `prop_rx.ino`. Then upload them with the **arduino-littlefs-upload** IDE plugin (*Ctrl+Shift+P → "Upload LittleFS to Pico/ESP8266/ESP32"*), with the Serial Monitor closed.
+
+- **Use the same Flash Size for the sketch upload and the data upload.** The filesystem's position on the flash depends on it. If they differ, or Flash Size is left on the board's default **"8MB (no FS)"**, the receiver finds no files. After changing Flash Size, upload the **sketch and then the data** again.
+- **The data upload always writes the whole filesystem**, whatever size your files are. That's why a small file still takes a while; a 2 MB filesystem uploads much faster than 7 MB.
+- **Check what's on the board:** open the Serial Monitor and type **`s`**. It shows the filesystem size, every file on the flash, and which `cueN.wav` files it will play.
 
 No sound cues wanted? Set `ENABLE_AUDIO false` and the receiver is MIDI-only.
 
