@@ -1,10 +1,11 @@
 # Wireless Prop Trigger
 
-A button in a handheld prop fires a lighting cue in Titan and a sound effect together.
+A button in a handheld prop fires a lighting cue in Titan and a sound effect together. Two props (used at different moments) share one receiver and fire the same effect.
 
 ```
- [Prop]                                 [Receiver at lighting PC]
- Challenger RP2040 SubGHz  ── 868 MHz ──▶ Challenger RP2040 SubGHz
+ [Prop 1, node 2] ─┐
+ [Prop 2, node 3] ─┴── 868 MHz ──▶ [Receiver at lighting PC]
+ Challenger RP2040 SubGHz            Challenger RP2040 SubGHz
  button + LiPo + FPC antenna               ├─ USB MIDI note ──▶ Titan (T3) trigger ─▶ lighting cue
                                            └─ I2S DAC line out ─▶ isolator ─▶ sound desk
 ```
@@ -31,7 +32,7 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 
 | # | Item | Qty | Notes |
 |---|------|-----|-------|
-| 1 | **iLabs Challenger RP2040 SubGHz, 868 MHz, U.FL** | **4** | 2 props (main and spare), 1 receiver, 1 cold spare. About £16 each. **Buy the 868 MHz version**, not the 915 MHz one. Loose headers are included. |
+| 1 | **iLabs Challenger RP2040 SubGHz, 868 MHz, U.FL** | **4** | 2 props, 1 receiver, 1 cold spare (can be flashed as either). About £16 each. **Buy the 868 MHz version**, not the 915 MHz one. Loose headers are included. |
 | 2 | **868 MHz U.FL flexible PCB (FPC) antenna**, adhesive | 2–3 | One per prop. Flat, sticks inside the prop shell. Must say 868 MHz (or 860–930 MHz). |
 | 3 | **U.FL to SMA bulkhead pigtail** (~10–15 cm) | 1 | Receiver: brings the antenna outside the box. |
 | 4 | **868 MHz SMA whip / rubber-duck antenna** | 1 | Receiver. Mount it high, with line of sight to the stage. |
@@ -49,8 +50,8 @@ UK stockist: The Pi Hut. Prices change, so check at checkout.
 
 | # | Item | Qty | Notes |
 |---|------|-----|-------|
-| 13 | **Plain 5 mm LEDs**: 1 green, 1 red | 2 | SIGNAL (green) and TRIGGER (red). |
-| 13a | 220 Ω resistor | 2 | One per LED. |
+| 13 | **Plain 5 mm LEDs**: 2 green, 1 red | 3 | SIGNAL 1 and SIGNAL 2 (green, one per prop) and TRIGGER (red). |
+| 13a | 220 Ω resistor | 3 | One per LED. |
 | 14 | **3D-printed case** (see [`enclosure/`](enclosure/README.md)) | 1 | 180 × 115 mm sloped desk console, two-colour labels. |
 | 15 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 | ARM. |
 | 16 | 30 mm arcade button | 1 | Backup GO. |
@@ -101,8 +102,9 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 | **D9** | DAC **DIN** |
 | **3V3** | DAC **3.3V** pin. Leave the DAC's **VCC** pin **unconnected** |
 | **GND** | DAC **GND**, and both LED **cathodes** (short leg, flat side) |
-| **D10** | **220 Ω** → **green** SIGNAL LED anode (long leg) |
-| **D11** | **220 Ω** → **red** TRIGGER LED anode (long leg) |
+| **D10** | **220 Ω** → **green SIGNAL 1** (prop 1) LED anode (long leg) |
+| **D11** | **220 Ω** → **red TRIGGER** LED anode (long leg) |
+| **D12** | **220 Ω** → **green SIGNAL 2** (prop 2) LED anode (long leg) |
 | **A0** | ARM switch, other leg to **GND** (closed = armed) |
 | **A1** | GO button, other leg to **GND** |
 | U.FL | Bulkhead SMA pigtail and 868 MHz antenna |
@@ -114,14 +116,15 @@ Skip the divider if you like: set `BATT_PIN` to `-1` in `prop_tx.ino`. The recei
 
 | LED | Colour | Meaning |
 |---|---|---|
-| **SIGNAL** (green) | off | No prop heard for 3 s (off, flat, or out of range) |
+| **SIGNAL 1 / SIGNAL 2** (green) | off | That prop not heard for 3 s (off, flat, or out of range) |
 | | solid | Prop connected, good signal |
 | | slow blink | Prop connected, weak signal (worse than −90 dBm) |
-| | fast blink | Prop battery low |
-| **TRIGGER** (red) | solid for 1 s | Cue fired (prop or GO) |
-| | flicker for 1 s | Prop pressed while **disarmed**; nothing fired |
+| | fast blink | That prop's battery is low |
+| **TRIGGER** (red) | solid for 1 s | Cue fired (either prop, or GO) |
+| | flicker for 1 s | A prop pressed while **disarmed**; nothing fired |
+| | 2 short blips every 3 s | **No USB host: no MIDI link.** Charge-only cable, PC off, or USB not enumerating |
 
-Both LEDs light for half a second at power-up as a lamp test. Both blinking together means the radio failed to start. Whether the receiver is armed shows on the flight switch itself.
+All three LEDs light for half a second at power-up as a lamp test. All blinking together means the radio failed to start. Whether the receiver is armed shows on the flight switch itself.
 
 **DAC control pins (MCU-5102):** this module brings the PCM5102A's control pins out as header pins instead of solder pads. They must be wired, not left floating:
 
@@ -166,7 +169,7 @@ Both LEDs light for half a second at power-up as a lamp test. Both blinking toge
    **First upload:** hold **BOOT** while plugging in USB, then pick the UF2 port. After that, normal uploads work.
 
 4. **Change the key.** Set `ENCRYPT_KEY` to your own 16-character string in **both** sketches. Change `NETWORK_ID` too if anyone else on site uses RFM69.
-5. **Second prop:** flash `prop_tx` again with `TX_NODE_ID 3`. For a different cue, also change `CUE_NUMBER`.
+5. **Two props:** flash the first transmitter with `TX_NODE_ID 2` (**PROP 1**, SIGNAL 1) and the second with `TX_NODE_ID 3` (**PROP 2**, SIGNAL 2). Leave `CUE_NUMBER 1` on both so they fire the same effect. If both are pressed within a second, only the first fires. Label the props so they don't get swapped.
 
 ### Sound files
 
@@ -192,25 +195,38 @@ No sound cues wanted? Set `ENABLE_AUDIO false` and the receiver is MIDI-only.
 4. Set the trigger's **key profile** so a note fires **Go** rather than toggling. Titan's default "Latch" profile toggles on/off as the signal changes. If it still misbehaves, set `SEND_NOTE_OFF false` in `prop_rx.ino`.
 5. **One app per MIDI port.** If anything else on that PC needs the note (e.g. a sound cue program), route it through **loopMIDI**.
 
+### MIDI not reaching Titan?
+
+Open the Arduino Serial Monitor (any baud rate) with the receiver plugged into the lighting PC. Type **`h`** to list the commands.
+
+1. **Is USB connected?** Type **`m`**.
+   - "USB: NOT connected" means the PC isn't talking to the receiver. The red TRIGGER LED also gives **two short blips every 3 s**. Usually it's a **charge-only cable**: swap it for a known data cable (one that works for file transfer to a phone). A USB hub or front-panel port can also be at fault, so try a rear port.
+   - If the Serial Monitor itself can't see the board, that alone suggests a charge-only cable.
+2. **Is the note leaving the receiver?** Every MIDI message is logged, e.g. `MIDI OUT note-on ch 1 note 60 (C4) vel 127 [USB host connected]`. Type **`n`** to send a **test note** on its own: no audio, and no one-second lockout, so it's ideal for Titan's **Learn**.
+3. **Is Windows seeing it?** Check that **"Prop Trigger"** appears as a MIDI device (Device Manager → Sound, video and game controllers). A free MIDI monitor such as **MIDI-OX** or **MIDIView** should show the note when you type `n`. **Close the monitor afterwards**, because Windows lets only one program open a MIDI input at a time. Restart Titan if it was open while the monitor had the port.
+4. **Is Titan listening?** Titan only picks up MIDI devices present when it starts, so plug the receiver in **before** starting Titan. Check the device is enabled as a MIDI input in Titan's settings, then redo the trigger's Learn using `n`.
+5. **Messages *from* the PC** are logged as `MIDI IN …`. If Titan or a MIDI tool sends anything, you'll see it, which proves the link works both ways.
+
 ---
 
 ## Bench test
 
-1. Power the receiver over USB. Both LEDs flash on briefly, then **SIGNAL** stays off (no prop yet).
-2. Switch the prop on. **SIGNAL** comes on solid (prop connected).
-3. With ARM off, press the prop button. **TRIGGER** flickers for 1 s and nothing fires. The Serial Monitor prints the RSSI.
-4. Flip ARM. Press the prop button: **TRIGGER** lights solid for 1 s, the MIDI note goes out, the WAV plays, and the Titan cue goes.
+1. Power the receiver over USB. All three LEDs flash on briefly, then the **SIGNAL** LEDs stay off (no props yet). If **TRIGGER** keeps double-blipping, the PC isn't connected over USB (see *MIDI not reaching Titan?*).
+2. Switch on prop 1, then prop 2. **SIGNAL 1** and **SIGNAL 2** come on solid. If the wrong one lights, that transmitter has the wrong `TX_NODE_ID`.
+3. With ARM off, press each prop's button. **TRIGGER** flickers for 1 s and nothing fires. The Serial Monitor names the prop and prints its RSSI.
+4. Flip ARM. Press each prop's button in turn, more than a second apart: **TRIGGER** lights solid for 1 s, the MIDI note goes out, the WAV plays, and the Titan cue goes.
 5. Press the prop button twice quickly. Only the first press fires, and the Serial Monitor logs the second as ignored. Wait a second and it fires again.
 6. Press the receiver's **GO** button. The same cue fires.
-7. **Range test in the real room**, with the actor's hand wrapped around the prop, from every position they'll use it. The Serial Monitor shows RSSI once a second:
+7. **Range test in the real room**, with the actor's hand wrapped around the prop, from every position they'll use it. The Serial Monitor shows both props' RSSI every 2 s:
    - **-50 to -80 dBm:** comfortable.
    - **Worse than -90 dBm:** move the receiver antenna, reroute the prop antenna, or raise `TX_POWER_DBM` up to 14.
 8. **Lip-sync check.** If the lamps visibly lag the sound, raise `AUDIO_DELAY_MS` in 10 ms steps.
 
 ## Show-day checklist
 
-- [ ] Prop LiPo charged, plus a spare in the corner
-- [ ] **SIGNAL** LED **solid** when the prop is switched on in the wings (not blinking). A test press makes **TRIGGER** flicker
+- [ ] Both prop LiPos charged, plus spares in the corner
+- [ ] Receiver plugged into the lighting PC **before Titan starts**. **TRIGGER** not double-blipping (USB OK)
+- [ ] **SIGNAL 1** and **SIGNAL 2** **solid** when the props are switched on in the wings (not blinking). A test press on each makes **TRIGGER** flicker
 - [ ] **ARM** flipped when the scene starts
 - [ ] Operator knows: no cue within ~½ s of the moment → hit **GO** (receiver) or the cue's GO on Titan
 - [ ] **Disarm** after the scene, so the button is safe for the rest of the show

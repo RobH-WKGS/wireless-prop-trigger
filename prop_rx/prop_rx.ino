@@ -25,17 +25,27 @@
 //   A cue can fire at most once per second (MIN_TRIGGER_GAP_MS), whatever
 //   fires it — prop, GO, or both together never double-fire.
 //
-//  Two plain 5 mm LEDs, each on its own pin through a 220 ohm resistor
-//   SIGNAL  (green, D10) — link to the prop
-//     off          no prop heard for 3 s (off / flat battery / out of range)
-//     solid        prop connected, good signal
-//     slow blink   prop connected, weak signal (RSSI below WEAK_RSSI)
-//     fast blink   prop battery low
-//   TRIGGER (red, D11) — 1 s each time the prop is pressed
-//     solid 1 s    cue fired (prop or GO button)
-//     flicker 1 s  prop pressed while DISARMED (nothing fired)
-//   Both on for half a second at power-up (lamp test). Both blinking
-//   together fast = radio fault. ARM state shows on the flight switch.
+//  Two props: flash prop_tx with TX_NODE_ID 2 (PROP 1) and 3 (PROP 2).
+//  Both fire the same cue; the 1 s limit stops a double fire if both are
+//  pressed together.
+//
+//  Three plain 5 mm LEDs, each on its own pin through a 220 ohm resistor
+//   SIGNAL 1 (green, D10) / SIGNAL 2 (green, D12) — link to prop 1 / prop 2
+//     off          that prop not heard for 3 s (off / flat / out of range)
+//     solid        connected, good signal
+//     slow blink   connected, weak signal (RSSI below WEAK_RSSI)
+//     fast blink   that prop's battery is low
+//   TRIGGER (red, D11)
+//     solid 1 s    cue fired (either prop, or GO)
+//     flicker 1 s  a prop pressed while DISARMED (nothing fired)
+//     2 blips / 3 s  NO USB HOST: no MIDI link (charge-only cable, PC off...)
+//   All on for half a second at power-up (lamp test). All blinking together
+//   fast = radio fault. ARM state shows on the flight switch.
+//
+//  Serial Monitor (any baud): h = help, m = MIDI/USB status,
+//   n = send a test MIDI note (for Titan Learn; no audio, no lockout),
+//   s = audio status, t = 1 kHz test tone. Every MIDI message in or out
+//   is logged.
 // =====================================================================
 
 #include <SPI.h>
@@ -73,8 +83,11 @@
 // ---------- Panel ----------------------------------------------------
 #define ARM_PIN        A0
 #define GO_PIN         A1
-#define SIGNAL_LED_PIN  D10        // green LED (GPIO5) via 220 ohm to GND
+#define SIGNAL1_LED_PIN D10        // PROP 1 (node 2): green LED (GPIO5) via 220 ohm to GND
+#define SIGNAL2_LED_PIN D12        // PROP 2 (node 3): green LED (GPIO7) via 220 ohm to GND
 #define TRIGGER_LED_PIN D11        // red LED (GPIO6) via 220 ohm to GND
+#define PROP1_NODE      2
+#define PROP2_NODE      3
 #define LED_BRIGHTNESS  120        // 0-255 PWM; lower for a dark backstage
 #define WEAK_RSSI       -90        // dBm; weaker than this = slow blink
 #define TRIGGER_LED_MS 1000        // how long the TRIGGER LED stays lit
@@ -129,6 +142,42 @@ char             audioStatus[512] = "audio: not started";
 // =====================================================================
 //  CORE 0 — radio, MIDI, panel
 // =====================================================================
+// ---------- MIDI diagnostics ----------
+uint32_t midiNotesSent = 0, midiInCount = 0, lastMidiSentAt = 0;
+bool     usbWasMounted = false;
+
+bool usbReady() { return TinyUSBDevice.mounted() && !TinyUSBDevice.suspended(); }
+
+const char *noteName(uint8_t n) {
+  static const char *names[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+  static char buf[8];
+  snprintf(buf, sizeof(buf), "%s%d", names[n % 12], n / 12 - 1);
+  return buf;
+}
+
+void midiNote(bool on, uint8_t note, uint8_t vel) {
+  bool ok = usbReady();
+  if (on) MIDI.sendNoteOn(note, vel, MIDI_CHANNEL);
+  else    MIDI.sendNoteOff(note, 0, MIDI_CHANNEL);
+  if (on) { midiNotesSent++; lastMidiSentAt = millis(); }
+  Serial.printf("[%lu] MIDI OUT note-%s ch %u note %u (%s) vel %u %s\n", millis(), on ? "on " : "off",
+                MIDI_CHANNEL, note, noteName(note), on ? vel : 0,
+                ok ? "[USB host connected]" : "[NOT DELIVERED: no USB host]");
+}
+
+void printMidiStatus() {
+  Serial.printf("USB: %s%s\n", TinyUSBDevice.mounted() ? "connected to a host" : "NOT connected (charge-only cable, or PC not enumerating)",
+                TinyUSBDevice.suspended() ? ", suspended (PC asleep?)" : "");
+  Serial.printf("MIDI device name: \"Prop Trigger\". Sends ch %u, cue 1 = note %u (%s), note-off after %u ms%s\n",
+                MIDI_CHANNEL, MIDI_BASE_NOTE, noteName(MIDI_BASE_NOTE), NOTE_LENGTH_MS, SEND_NOTE_OFF ? "" : " (note-off disabled)");
+  Serial.printf("MIDI notes sent: %lu (last %lu ms ago), MIDI messages received: %lu\n", midiNotesSent,
+                midiNotesSent ? millis() - lastMidiSentAt : 0, midiInCount);
+}
+
+void printHelp() {
+  Serial.println("Commands: h help | m MIDI/USB status | n send test MIDI note | s audio status | t test tone");
+}
+
 void lightTrigger(bool flicker) {
   trigLedFlicker = flicker;
   trigLedUntil  = millis() + TRIGGER_LED_MS;
@@ -145,7 +194,7 @@ void fireCue(uint8_t cue, const char *source) {
   everFired[cue]  = true;
   lastFireAt[cue] = now;
   uint8_t note = MIDI_BASE_NOTE + cue - 1;
-  MIDI.sendNoteOn(note, 127, MIDI_CHANNEL);
+  midiNote(true, note, 127);
   noteOffAt[cue] = now + NOTE_LENGTH_MS;
   if (ENABLE_AUDIO) pendingCue = cue;
   lightTrigger(false);
@@ -169,7 +218,7 @@ void handlePacket(uint16_t sender, const Packet &p, int16_t rssi) {
 
   bool armed = (digitalRead(ARM_PIN) == LOW);
   if (armed) {
-    char src[24]; snprintf(src, sizeof(src), "prop %u (RSSI %d)", sender, rssi);
+    char src[32]; snprintf(src, sizeof(src), "PROP %u (node %u, RSSI %d)", sender == PROP2_NODE ? 2 : 1, sender, rssi);
     fireCue(p.cue, src);
   } else {
     // same 1-per-second limit applies to the test flash
@@ -189,26 +238,27 @@ void setLed(uint8_t pin, bool on) {
   analogWrite(pin, on ? LED_BRIGHTNESS : 0);
 }
 
+// SIGNAL pattern for one prop: off / solid / slow blink (weak) / fast blink (low battery)
+bool signalFor(uint8_t node, uint32_t now) {
+  NodeState &n = nodes[node];
+  if (!n.lastHeard || (now - n.lastHeard) >= PROP_TIMEOUT_MS) return false;
+  if (n.battMv && n.battMv < LOW_BATT_MV) return (now / 125) % 2;   // fast blink, 4 Hz
+  if (n.rssi < WEAK_RSSI)                 return (now / 500) % 2;   // slow blink, 1 Hz
+  return true;
+}
+
 void updateLeds() {
   uint32_t now = millis();
-  bool alive = false, lowBatt = false, weak = false;
-  for (int i = 2; i < 8; i++) {
-    if (nodes[i].lastHeard && (now - nodes[i].lastHeard) < PROP_TIMEOUT_MS) {
-      alive = true;
-      if (nodes[i].battMv && nodes[i].battMv < LOW_BATT_MV) lowBatt = true;
-      if (nodes[i].rssi < WEAK_RSSI) weak = true;
-    }
-  }
-  bool sig;
-  if (!alive)        sig = false;
-  else if (lowBatt)  sig = (now / 125) % 2;   // fast blink, 4 Hz
-  else if (weak)     sig = (now / 500) % 2;   // slow blink, 1 Hz
-  else               sig = true;
-  setLed(SIGNAL_LED_PIN, sig);
+  setLed(SIGNAL1_LED_PIN, signalFor(PROP1_NODE, now));
+  setLed(SIGNAL2_LED_PIN, signalFor(PROP2_NODE, now));
 
   bool trig = false;
-  if ((int32_t)(trigLedUntil - now) > 0)
+  if ((int32_t)(trigLedUntil - now) > 0) {
     trig = trigLedFlicker ? (now / 60) % 2 : true;
+  } else if (!TinyUSBDevice.mounted()) {
+    uint32_t ph = now % 3000;                // no USB host: two short blips every 3 s
+    trig = (ph < 80) || (ph >= 250 && ph < 330);
+  }
   setLed(TRIGGER_LED_PIN, trig);
 }
 
@@ -225,13 +275,10 @@ void setup() {
   pinMode(ARM_PIN, INPUT_PULLUP);
   pinMode(GO_PIN, INPUT_PULLUP);
 
-  pinMode(SIGNAL_LED_PIN, OUTPUT);
-  pinMode(TRIGGER_LED_PIN, OUTPUT);
-  analogWrite(SIGNAL_LED_PIN, LED_BRIGHTNESS);       // lamp test: both on briefly
-  analogWrite(TRIGGER_LED_PIN, LED_BRIGHTNESS);
+  const uint8_t ledPins[] = {SIGNAL1_LED_PIN, SIGNAL2_LED_PIN, TRIGGER_LED_PIN};
+  for (uint8_t pin : ledPins) { pinMode(pin, OUTPUT); analogWrite(pin, LED_BRIGHTNESS); }  // lamp test
   delay(500);
-  analogWrite(SIGNAL_LED_PIN, 0);
-  analogWrite(TRIGGER_LED_PIN, 0);
+  for (uint8_t pin : ledPins) analogWrite(pin, 0);
 
   pinMode(RFM_RST, OUTPUT);
   digitalWrite(RFM_RST, HIGH); delay(10);
@@ -240,7 +287,7 @@ void setup() {
   if (!radio.initialize(RF69_868MHZ, RX_NODE_ID, NETWORK_ID)) {
     while (true) {                                   // radio fault: both LEDs blink together
       int v = (millis() / 100) % 2 ? LED_BRIGHTNESS : 0;
-      analogWrite(SIGNAL_LED_PIN, v); analogWrite(TRIGGER_LED_PIN, v);
+      analogWrite(SIGNAL1_LED_PIN, v); analogWrite(SIGNAL2_LED_PIN, v); analogWrite(TRIGGER_LED_PIN, v);
       delay(50);
     }
   }
@@ -254,12 +301,31 @@ void loop() {
 #ifdef TINYUSB_NEED_POLLING_TASK
   TinyUSBDevice.task();
 #endif
-  MIDI.read();                                       // keep the USB MIDI endpoint drained
+  // Drain incoming MIDI (and log it: handy to confirm the PC can talk to us)
+  while (MIDI.read()) {
+    midiInCount++;
+    Serial.printf("[%lu] MIDI IN type 0x%02X ch %u data %u %u\n", millis(), (unsigned)MIDI.getType(),
+                  MIDI.getChannel(), MIDI.getData1(), MIDI.getData2());
+  }
+  // Log USB connect / disconnect
+  bool mounted = TinyUSBDevice.mounted();
+  if (mounted != usbWasMounted) {
+    usbWasMounted = mounted;
+    Serial.printf("[%lu] USB %s\n", millis(), mounted ? "connected to host: MIDI ready"
+                                                        : "disconnected: no MIDI link");
+  }
 
-  // Serial Monitor commands: 's' = audio status, 't' = 1 kHz test tone
+  // Serial Monitor commands (see printHelp)
   while (Serial.available()) {
     char c = Serial.read();
-    if (c == 's' || c == 'S') { Serial.print(audioStatus); Serial.println(); }
+    if (c == 'h' || c == 'H' || c == '?') printHelp();
+    else if (c == 'm' || c == 'M') printMidiStatus();
+    else if (c == 'n' || c == 'N') {             // test note for Titan Learn: no audio, no lockout
+      Serial.println("test MIDI note (no audio):");
+      midiNote(true, MIDI_BASE_NOTE, 127);
+      noteOffAt[1] = millis() + NOTE_LENGTH_MS;
+    }
+    else if (c == 's' || c == 'S') { Serial.print(audioStatus); Serial.println(); }
     else if (c == 't' || c == 'T') {
       if (audioReady) { toneRequest = true; Serial.println("test tone: 1 kHz for 2 s"); }
       else            { Serial.print("test tone unavailable: "); Serial.print(audioStatus); Serial.println(); }
@@ -283,19 +349,27 @@ void loop() {
   uint32_t now = millis();
   for (int c = 1; c <= MAX_CUES; c++) {
     if (noteOffAt[c] && (int32_t)(now - noteOffAt[c]) >= 0) {
-      if (SEND_NOTE_OFF) MIDI.sendNoteOff(MIDI_BASE_NOTE + c - 1, 0, MIDI_CHANNEL);
+      if (SEND_NOTE_OFF) midiNote(false, MIDI_BASE_NOTE + c - 1, 0);
       noteOffAt[c] = 0;
     }
   }
 
   updateLeds();
 
-  // Once a second, print link quality to the serial monitor
+  // Every 2 s, print link quality and USB state to the serial monitor
   static uint32_t lastReport = 0;
-  if (now - lastReport > 1000) {
+  if (now - lastReport > 2000) {
     lastReport = now;
-    for (int i = 2; i < 8; i++) if (nodes[i].lastHeard && now - nodes[i].lastHeard < PROP_TIMEOUT_MS)
-      Serial.printf("prop %d: RSSI %d dBm, batt %u mV\n", i, nodes[i].rssi, nodes[i].battMv);
+    char line[160]; size_t k = 0;
+    for (int p = 1; p <= 2; p++) {
+      NodeState &n = nodes[p == 1 ? PROP1_NODE : PROP2_NODE];
+      if (n.lastHeard && now - n.lastHeard < PROP_TIMEOUT_MS)
+        k += snprintf(line + k, sizeof(line) - k, "PROP %d: %d dBm %u mV | ", p, n.rssi, n.battMv);
+      else
+        k += snprintf(line + k, sizeof(line) - k, "PROP %d: -- | ", p);
+    }
+    snprintf(line + k, sizeof(line) - k, "USB %s, %lu notes sent", TinyUSBDevice.mounted() ? "ok" : "NO HOST", midiNotesSent);
+    Serial.println(line);
   }
 }
 

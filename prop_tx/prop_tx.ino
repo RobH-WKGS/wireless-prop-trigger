@@ -33,7 +33,7 @@
 #define TX_POWER_DBM   10               // 10 dBm is ample for 6 m; max legal here is 14
 
 // ---------- THIS PROP ------------------------------------------------
-#define TX_NODE_ID     2                // 2 = main prop, 3 = spare prop
+#define TX_NODE_ID     2                // 2 = PROP 1, 3 = PROP 2 (flash each transmitter with its own)
 #define CUE_NUMBER     1                // -> MIDI note 60 at the receiver
 #define BUTTON_PIN     D5               // momentary button between D5 and GND
 #define BATT_PIN       A2               // 100k/100k divider from BAT; set to -1 if not fitted

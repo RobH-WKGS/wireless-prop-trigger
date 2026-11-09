@@ -1,6 +1,6 @@
 # Receiver case
 
-A 3D-printable sloped desk console for the receiver. It has a base tray for the electronics and a control lid with the **ARM** flight switch, the **GO** arcade button, and **SIGNAL** and **TRIGGER** LEDs. The labels print as two-colour inlays, and the case is held together with four M3 socket-head screws.
+A 3D-printable sloped desk console for the receiver. It has a base tray for the electronics and a control lid with the **ARM** flight switch, the **GO** arcade button, two **SIGNAL** LEDs (one per prop) and a **TRIGGER** LED. The labels print as two-colour inlays, and the case is held together with four M3 socket-head screws.
 
 ![Assembled](images/assembled.png)
 
@@ -19,7 +19,7 @@ A 3D-printable sloped desk console for the receiver. It has a base tray for the 
 
 ## Layout
 
-- **Top:** ARM switch on the left, a 30 mm GO button on the right, and the SIGNAL and TRIGGER LEDs at the back.
+- **Top:** ARM switch on the left, a 30 mm GO button on the right, and the SIGNAL 1, SIGNAL 2 and TRIGGER LEDs along the back.
   - **Rotation stop (inside the lid):** two 8 mm rails under the lid sit either side of the switch's 16 × 29.4 mm body, 16.4 mm apart, so it can't twist. The rails are open-ended, so only the hole needs to be centred across the body's width. A 20 mm relief through their top 3 mm lets the inner bushing nut turn.
   - **Flip cover:** sits on the flat top, clamped by the outer nut. An optional outside pocket for it is in the model but off by default (see below).
   - The switch, button and screws all sit square to the sloped top.
@@ -98,7 +98,7 @@ Settings you may need to change:
 | `arm_rail_gap` | 16.4 | Your switch body isn't 16 mm wide (use body width + 0.4). `arm_rails = false` removes the stop. |
 | `arm_nut_relief_d` / `_h` | 20 / 3 | Your inner bushing nut is bigger, or thicker than 3 mm. |
 | `arm_cover_pocket` | false | You want a 1.2 mm locating pocket on top for the flip cover. It's sized for a 17.85 × 40.8 mm cover with its hole 14.8 mm from the hinge end, hinge toward the operator. Covers differ between makers, so check yours first. |
-| `leds` | SIGNAL, TRIGGER | You want to move the LEDs or rename their labels. |
+| `leds` | SIGNAL 1, SIGNAL 2, TRIGGER | You want to move the LEDs or rename their labels. |
 | `usb_z_above_pcb` | 1.63 | The USB-C opening is too high or low on the fit test. |
 | `insert_d` | 4.0 | Your M3 inserts specify a different hole. Set `fastener = "tap"` to screw straight into plastic instead. |
 | `battery_bay` | true | You're running from USB only. |
@@ -139,7 +139,7 @@ PLA+ or PETG both work. PETG is tougher if the box will be knocked around backst
 | 12 mm self-adhesive rubber bumper feet | 4 |
 | Flight / missile toggle switch with flip cover (12 mm bushing) | 1 |
 | 30 mm arcade button | 1 |
-| Plain 5 mm LEDs (1 green, 1 red) + 220 Ω resistors | 2 each |
+| Plain 5 mm LEDs (2 green, 1 red) + 220 Ω resistors | 3 each |
 | 3.5 mm stereo panel-mount extension cable (~6 mm thread) | 1 |
 | SMA bulkhead to U.FL pigtail + 868 MHz antenna | 1 |
 | Zip ties (3 mm), foam tape, hook-and-loop strap | a few |
@@ -151,7 +151,7 @@ PLA+ or PETG both work. PETG is tougher if the box will be knocked around backst
 3. **DAC:** stick it down with foam tape between its two loops, then zip-tie it.
 4. **Back panel:** fit the SMA bulkhead, and the panel end of the 3.5 mm extension cable in the LINE OUT hole. Plug its other end into the DAC module's jack.
 5. **Lid:**
-   - Fit the ARM switch from below with its body between the rails, then the flip cover and outer nut on top. Next fit the GO button and both LEDs. The green SIGNAL LED goes on the left and the red TRIGGER LED on the right. Each LED's rim sits in its tube under the lid; add a dab of hot glue.
+   - Fit the ARM switch from below with its body between the rails, then the flip cover and outer nut on top. Next fit the GO button and all three LEDs. Left to right: green SIGNAL 1, green SIGNAL 2, red TRIGGER. Each LED's rim sits in its tube under the lid; add a dab of hot glue.
    - Wire the switch, button and LEDs to the board (see the main README and the receiver schematic).
    - Leave enough wire slack to open the lid fully.
 6. **Close up:** drop the lid on (the skirt locates it) and fit the four M3 × 10 screws. Don't over-tighten into the inserts.
