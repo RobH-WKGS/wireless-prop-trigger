@@ -73,7 +73,13 @@
 #define MIDI_CHANNEL   1
 #define MIDI_BASE_NOTE 60          // cue 1 = note 60 (C4), cue 2 = 61 ...
 #define NOTE_LENGTH_MS 100         // note-off follows after this
-#define SEND_NOTE_OFF  true        // set false if Titan's key profile toggles on release
+#define SEND_NOTE_OFF  true
+// true  = the receiver appears to the PC as a MIDI-only USB device (no
+//         serial port). Try this if Titan's USB Expert doesn't list the
+//         receiver: some hardware-focused USB services ignore combined
+//         serial+MIDI devices. Serial Monitor diagnostics stop; LEDs still work.
+// false = MIDI + serial port (Serial Monitor commands and logging).
+#define USB_MIDI_ONLY  false
 
 // ---------- Audio ----------------------------------------------------
 #define ENABLE_AUDIO   true        // false = MIDI only (sound handled elsewhere)
@@ -269,6 +275,7 @@ void updateLeds() {
 void setup() {
   // USB first so Windows sees a MIDI device straight away
   if (!TinyUSBDevice.isInitialized()) TinyUSBDevice.begin(0);
+  if (USB_MIDI_ONLY) TinyUSBDevice.clearConfiguration();   // drop the serial (CDC) interface
   TinyUSBDevice.setProductDescriptor("Prop Trigger");
   usbMidi.setStringDescriptor("Prop Trigger MIDI");
   MIDI.begin(MIDI_CHANNEL_OMNI);
